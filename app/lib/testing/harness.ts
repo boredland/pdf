@@ -14,6 +14,7 @@ import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { measureSkew } from "~/lib/workers/preprocess-client";
 import { runDetectPipeline, readDetectRegions } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline, readOcrResult } from "~/lib/pipeline/ocr-pipeline";
+import { runMrcPipeline, readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { listProviders } from "~/lib/providers/registry";
 import {
   clearSessionPassphrase,
@@ -66,6 +67,10 @@ declare global {
         readOcrResult: typeof readOcrResult;
         listProviders: typeof listProviders;
       };
+      mrc: {
+        runMrcPipeline: typeof runMrcPipeline;
+        readMrcManifest: typeof readMrcManifest;
+      };
       apiKeys: {
         has: typeof hasApiKey;
         store: typeof storeApiKey;
@@ -83,6 +88,7 @@ declare global {
     __pdfRenderCallCount?: number;
     __pdfPreprocessCallCount?: number;
     __pdfDetectCallCount?: number;
+    __pdfMrcCallCount?: number;
   }
 }
 
@@ -101,6 +107,7 @@ export function installTestHarness(): void {
     preprocess: { runPreprocessPipeline, measureSkew },
     detect: { runDetectPipeline, readDetectRegions },
     ocr: { runOcrPipeline, readOcrResult, listProviders },
+    mrc: { runMrcPipeline, readMrcManifest },
     apiKeys: {
       has: hasApiKey,
       store: storeApiKey,

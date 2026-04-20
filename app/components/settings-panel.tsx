@@ -27,6 +27,12 @@ export function SettingsPanel({
     });
   }
 
+  async function updateMrcPreset(preset: Project["settings"]["mrc"]["preset"]) {
+    await getDb().projects.update(project.id, {
+      settings: { ...project.settings, mrc: { preset } },
+    });
+  }
+
   const providers = listProviders();
 
   return (
@@ -92,6 +98,24 @@ export function SettingsPanel({
               {p.label}
             </option>
           ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-2 sm:col-span-3">
+        <span className="shrink-0">Output compression</span>
+        <select
+          data-testid="settings-mrc-preset"
+          className="min-w-0 rounded border border-slate-700 bg-slate-800 px-2 py-1"
+          value={project.settings.mrc.preset}
+          disabled={disabled}
+          onChange={(e) =>
+            void updateMrcPreset(
+              e.target.value as Project["settings"]["mrc"]["preset"],
+            )
+          }
+        >
+          <option value="lossless">Lossless</option>
+          <option value="archival">Archival (JPEG 85%)</option>
+          <option value="compact">Compact (JPEG 50% · half DPI)</option>
         </select>
       </label>
     </form>
