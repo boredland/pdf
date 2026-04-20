@@ -5,14 +5,15 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const { dummyWasmUrl } = Route.useRouteContext();
   return (
     <div className="space-y-4">
       <h1 className="text-3xl font-semibold tracking-tight" data-testid="home-heading">
         Client-side OCR for PDFs
       </h1>
-      <p className="text-slate-400 max-w-prose">
-        This shell is step 0 of the delivery plan. Drop a PDF anywhere (soon), or load the bundled
-        NARA example. Everything runs in your browser.
+      <p className="max-w-prose text-slate-400">
+        This shell is running. Drop a PDF (coming in step 2) or load the bundled NARA example.
+        Everything runs in your browser.
       </p>
       <div
         data-testid="home-placeholder"
@@ -20,6 +21,9 @@ function Home() {
       >
         Upload + render coming in step 2.
       </div>
+      <p className="text-xs text-slate-600" data-testid="dummy-wasm-url">
+        precache-probe: {dummyWasmUrl}
+      </p>
     </div>
   );
 }
