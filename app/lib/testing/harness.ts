@@ -15,6 +15,7 @@ import { measureSkew } from "~/lib/workers/preprocess-client";
 import { runDetectPipeline, readDetectRegions } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline, readOcrResult } from "~/lib/pipeline/ocr-pipeline";
 import { runMrcPipeline, readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
+import { runStage, runFromStage, PIPELINE_ORDER } from "~/lib/pipeline/run-stage";
 import { listProviders } from "~/lib/providers/registry";
 import {
   clearSessionPassphrase,
@@ -71,6 +72,11 @@ declare global {
         runMrcPipeline: typeof runMrcPipeline;
         readMrcManifest: typeof readMrcManifest;
       };
+      pipeline: {
+        runStage: typeof runStage;
+        runFromStage: typeof runFromStage;
+        order: typeof PIPELINE_ORDER;
+      };
       apiKeys: {
         has: typeof hasApiKey;
         store: typeof storeApiKey;
@@ -108,6 +114,7 @@ export function installTestHarness(): void {
     detect: { runDetectPipeline, readDetectRegions },
     ocr: { runOcrPipeline, readOcrResult, listProviders },
     mrc: { runMrcPipeline, readMrcManifest },
+    pipeline: { runStage, runFromStage, order: PIPELINE_ORDER },
     apiKeys: {
       has: hasApiKey,
       store: storeApiKey,

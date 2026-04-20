@@ -7,7 +7,10 @@ import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
 import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
+import { PIPELINE_ORDER, runStage } from "~/lib/pipeline/run-stage";
 import { rewindToStage } from "~/lib/pipeline/rewind";
+import { PageDetailPane } from "~/components/page-detail-pane";
+import type { Stage } from "~/lib/storage/db";
 import { progressChannel, type ProgressEvent } from "~/lib/progress";
 import { EXAMPLE_PDF_NAME, loadExamplePdf } from "~/lib/examples";
 import { SettingsPanel } from "~/components/settings-panel";
@@ -18,6 +21,8 @@ export function ProjectView() {
   const [isBusy, setIsBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stageToRun, setStageToRun] = useState<"all" | Exclude<Stage, "build">>("all");
+  const [openPageIndex, setOpenPageIndex] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const project = useLiveQuery<Project | undefined>(
@@ -99,6 +104,34 @@ export function ProjectView() {
     }
   }, [project]);
 
+  const onRunStage = useCallback(async () => {
+    if (!project) return;
+    setError(null);
+    setIsBusy(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      if (stageToRun === "all") {
+        await runRenderPipeline(project, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        await runPreprocessPipeline(project, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        await runDetectPipeline(project, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        await runOcrPipeline(project, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        await runMrcPipeline(project, { signal: controller.signal });
+      } else {
+        await runStage(project, stageToRun, { signal: controller.signal });
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsBusy(false);
+      abortRef.current = null;
+    }
+  }, [project, stageToRun]);
+
   const pageList = pages ?? [];
 
   return (
@@ -129,14 +162,33 @@ export function ProjectView() {
             </div>
             <div className="flex items-center gap-2">
               {!isBusy && (
-                <button
-                  type="button"
-                  onClick={() => void onReprocess()}
-                  data-testid="reprocess-button"
-                  className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1 text-sm text-slate-200 hover:bg-slate-700"
-                >
-                  Re-run preprocess
-                </button>
+                <>
+                  <select
+                    value={stageToRun}
+                    onChange={(e) =>
+                      setStageToRun(
+                        e.target.value as "all" | Exclude<Stage, "build">,
+                      )
+                    }
+                    data-testid="stage-picker"
+                    className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-200"
+                  >
+                    <option value="all">Full pipeline</option>
+                    {PIPELINE_ORDER.map((s) => (
+                      <option key={s} value={s}>
+                        Only {s}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void onRunStage()}
+                    data-testid="run-stage-button"
+                    className="rounded-md bg-sky-500/20 px-3 py-1 text-sm text-sky-200 hover:bg-sky-500/30"
+                  >
+                    Run
+                  </button>
+                </>
               )}
               {isBusy && (
                 <button
@@ -151,7 +203,18 @@ export function ProjectView() {
             </div>
           </header>
           <SettingsPanel project={project} disabled={isBusy} />
-          <PageGrid pages={pageList} running={runningStages} />
+          <PageGrid
+            pages={pageList}
+            running={runningStages}
+            onOpen={(idx) => setOpenPageIndex(idx)}
+          />
+          {openPageIndex !== null && (
+            <PageDetailPane
+              project={project}
+              pageIndex={openPageIndex}
+              onClose={() => setOpenPageIndex(null)}
+            />
+          )}
         </section>
       )}
     </div>
@@ -225,9 +288,11 @@ function DropZone(props: {
 function PageGrid({
   pages,
   running,
+  onOpen,
 }: {
   pages: Page[];
   running: Map<number, ProgressEvent>;
+  onOpen: (index: number) => void;
 }) {
   if (pages.length === 0) {
     return (
@@ -261,23 +326,30 @@ function PageGrid({
             data-mrc-status={page.status.mrc ? "done" : "pending"}
             className="rounded-md border border-slate-800 bg-slate-900/60 p-2"
           >
-            <div className="aspect-[3/4] overflow-hidden rounded bg-slate-800/60">
-              {page.thumbnailDataUrl ? (
-                <img
-                  src={page.thumbnailDataUrl}
-                  alt={`page ${page.index + 1}`}
-                  className="h-full w-full object-contain"
-                  data-testid={`page-thumb-${page.index}`}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-[10px] text-slate-600">
-                  {status === "running" ? "rendering…" : "queued"}
-                </div>
-              )}
-            </div>
-            <p className="mt-1 text-center text-[10px] text-slate-500">
-              page {page.index + 1} · {status}
-            </p>
+            <button
+              type="button"
+              onClick={() => onOpen(page.index)}
+              data-testid={`page-open-${page.index}`}
+              className="block w-full text-left"
+            >
+              <div className="aspect-[3/4] overflow-hidden rounded bg-slate-800/60">
+                {page.thumbnailDataUrl ? (
+                  <img
+                    src={page.thumbnailDataUrl}
+                    alt={`page ${page.index + 1}`}
+                    className="h-full w-full object-contain"
+                    data-testid={`page-thumb-${page.index}`}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-[10px] text-slate-600">
+                    {status === "running" ? "rendering…" : "queued"}
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-center text-[10px] text-slate-500">
+                page {page.index + 1} · {status}
+              </p>
+            </button>
           </li>
         );
       })}
