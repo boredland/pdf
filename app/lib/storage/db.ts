@@ -56,6 +56,11 @@ export interface Page {
   thumbnailDataUrl?: string;
   /** per-stage thumbnails (data URLs), populated as each stage completes */
   thumbnails?: Partial<Record<Stage, string>>;
+  /**
+   * Per-page rotation override. When set, preprocess uses this instead of
+   * the OSD-detected angle. `null`/undefined means "defer to OSD".
+   */
+  rotationOverride?: 0 | 90 | 180 | 270;
 }
 
 export interface Job {

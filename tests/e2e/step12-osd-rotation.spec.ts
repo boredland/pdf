@@ -173,4 +173,66 @@ test.describe("step 12 — OSD cardinal rotation correction", () => {
     // (360 - storedAngle) mod 360: 0, 270, 180, 90.
     expect(result).toEqual([0, 270, 180, 90]);
   });
+
+  test("manual rotation override supersedes OSD and re-runs downstream", async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock");
+    });
+    const outcome = await page.evaluate(async () => {
+      const app = window.__pdfApp!;
+      const bytes = await app.example.load();
+      const project = await app.projects.createProjectFromBytes(
+        "manual-rotation",
+        bytes,
+      );
+      await app.render.ensurePageRows(project);
+      await app.pipeline.runFromStage(
+        (await app.projects.getProject(project.id))!,
+        "all",
+      );
+      const beforeBuildCalls = window.__pdfBuildCallCount ?? 0;
+
+      // Force page 0 to a non-default rotation, which must invalidate
+      // preprocess/detect/ocr/mrc for that page + the project.build.
+      await app.rewind.setRotationOverride(project.id, 0, 90);
+      const page0AfterOverride = await app.db.pages.get(`${project.id}:0`);
+
+      // Re-run the tail end of the pipeline for page 0 + rebuild.
+      await app.pipeline.runFromStage(
+        (await app.projects.getProject(project.id))!,
+        "preprocess",
+        { pageIndices: [0] },
+      );
+      await app.pipeline.runStage(
+        (await app.projects.getProject(project.id))!,
+        "build",
+      );
+      const page0Final = await app.db.pages.get(`${project.id}:0`);
+      const page1Final = await app.db.pages.get(`${project.id}:1`);
+
+      // Revert — rotationOverride drops off and the artifacts clear again.
+      await app.rewind.setRotationOverride(project.id, 0, null);
+      const page0AfterRevert = await app.db.pages.get(`${project.id}:0`);
+
+      return {
+        overrideImmediatelyStored: page0AfterOverride?.rotationOverride,
+        preprocessClearedByOverride: !page0AfterOverride?.status?.preprocess,
+        otherPageUntouched: !!page1Final?.status?.preprocess,
+        page0Applied: page0Final?.status?.preprocess?.osdAngleDegrees,
+        buildCallsDelta: (window.__pdfBuildCallCount ?? 0) - beforeBuildCalls,
+        revertClearsOverride: page0AfterRevert?.rotationOverride === undefined,
+        revertClearsPreprocess: !page0AfterRevert?.status?.preprocess,
+      };
+    });
+
+    expect(outcome.overrideImmediatelyStored).toBe(90);
+    expect(outcome.preprocessClearedByOverride).toBe(true);
+    expect(outcome.otherPageUntouched).toBe(true);
+    expect(outcome.page0Applied).toBe(90);
+    expect(outcome.buildCallsDelta).toBeGreaterThan(0);
+    expect(outcome.revertClearsOverride).toBe(true);
+    expect(outcome.revertClearsPreprocess).toBe(true);
+  });
 });

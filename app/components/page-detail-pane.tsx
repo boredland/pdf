@@ -4,7 +4,8 @@ import { getDb, type Page, type Project, type Stage } from "~/lib/storage/db";
 import { readBlob } from "~/lib/storage/opfs";
 import { readOcrResult } from "~/lib/pipeline/ocr-pipeline";
 import { readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
-import { runStage } from "~/lib/pipeline/run-stage";
+import { runStage, runFromStage } from "~/lib/pipeline/run-stage";
+import { setPageRotationOverride } from "~/lib/pipeline/rewind";
 
 type TabId = "render" | "preprocess" | "detect" | "ocr" | "mrc";
 
@@ -173,8 +174,14 @@ function StageContent({
 }) {
   switch (tab) {
     case "render":
+      return <ImageArtifact path={page.status.render?.artifactPath} />;
     case "preprocess":
-      return <ImageArtifact path={page.status[tab]?.artifactPath} />;
+      return (
+        <div className="space-y-2">
+          <RotationControls project={project} page={page} />
+          <ImageArtifact path={page.status.preprocess?.artifactPath} />
+        </div>
+      );
     case "detect":
       return <DetectView project={project} page={page} />;
     case "ocr":
@@ -182,6 +189,86 @@ function StageContent({
     case "mrc":
       return <MrcView project={project} page={page} />;
   }
+}
+
+function RotationControls({ project, page }: { project: Project; page: Page }) {
+  const [busy, setBusy] = useState(false);
+  const appliedAngle = page.status.preprocess?.osdAngleDegrees ?? 0;
+  const override = page.rotationOverride;
+
+  async function apply(angle: 0 | 90 | 180 | 270 | null) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await setPageRotationOverride(project.id, page.index, angle);
+      // Re-run preprocess through build for just this page. Build reuses
+      // all other pages' cached artifacts.
+      const fresh = await getDb().projects.get(project.id);
+      if (fresh) {
+        await runFromStage(fresh, "preprocess", { pageIndices: [page.index] });
+        // Rebuild the project-wide PDF.
+        await runStage(fresh, "build");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const options: Array<{ angle: 0 | 90 | 180 | 270; label: string }> = [
+    { angle: 0, label: "0°" },
+    { angle: 90, label: "90°" },
+    { angle: 180, label: "180°" },
+    { angle: 270, label: "270°" },
+  ];
+
+  return (
+    <div
+      data-testid="detail-rotation-controls"
+      className="flex flex-wrap items-center gap-2 rounded border border-slate-800 bg-slate-900/60 p-2 text-xs"
+    >
+      <span className="text-slate-400">
+        Applied: <span data-testid="detail-rotation-applied">{appliedAngle}°</span>
+        {override !== undefined && (
+          <span className="ml-1 rounded bg-amber-500/20 px-1 text-amber-300">
+            manual
+          </span>
+        )}
+      </span>
+      <div className="flex gap-1">
+        {options.map((o) => {
+          const isActive = override === o.angle;
+          return (
+            <button
+              key={o.angle}
+              type="button"
+              disabled={busy}
+              onClick={() => void apply(o.angle)}
+              data-testid={`detail-rotate-${o.angle}`}
+              className={`rounded px-2 py-1 ${
+                isActive
+                  ? "bg-sky-500/30 text-sky-100"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              } disabled:opacity-50`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      {override !== undefined && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void apply(null)}
+          data-testid="detail-rotate-revert"
+          className="rounded bg-slate-800 px-2 py-1 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+          title="Revert to auto-detected rotation"
+        >
+          use OSD
+        </button>
+      )}
+    </div>
+  );
 }
 
 function useBlobUrl(path: string | undefined): string | null {

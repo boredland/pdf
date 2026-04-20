@@ -19,6 +19,15 @@
 - [x] E2E speedup (~7m → 2m20s) + mask-worker fix    7fc8988
 - [x] Image upload fix + step11 spec                 0a4232c
 
+## Pipeline parallelism
+- [ ] Drive the pipeline as a per-page DAG: page N moves on to its next
+      stage as soon as its upstream artifact is ready, instead of the
+      current "stage-wide barrier" where all pages finish render before
+      any page can start preprocess. Touches render/preprocess/detect/
+      ocr/mrc pipelines and the orchestrator. Keep build as the only
+      project-scoped join. Expected win: 1.5-2× throughput on multi-
+      page docs today.
+
 ## Step 10 — Polish (remaining)
 - [ ] Keyboard navigation across full UI (tab order, focus rings, shortcuts)
 - [ ] axe accessibility scan, zero WCAG AA violations
@@ -46,12 +55,11 @@
 - [x] Verified osd/eng traineddata already match the SW runtime
       CacheFirst rule (`/\.traineddata(\.gz)?$/i`). Lazy-cached on
       first fetch, offline thereafter — matches the delivery plan.
-- [ ] Provide a manual "rotate page" control in the detail pane (and
-      probably as a quick action on the page card too) as an escape
-      hatch when OSD gets it wrong. Needs: per-page rotation override
-      stored on the Page row, participates in preprocess hash so a
-      change invalidates downstream stages cleanly. Four-way toggle:
-      0° / 90° CW / 180° / 90° CCW.
+- [x] Manual "rotate page" control in the detail pane. Per-page
+      rotationOverride on the Page row bypasses OSD. Applying one
+      cascades through preprocess/detect/ocr/mrc for that page and
+      invalidates project.build. Revert restores OSD behaviour.
+                                                              (shipped)
 
 ## Automatic language detection
 - [ ] Detect the page language(s) before OCR runs so users don't have to

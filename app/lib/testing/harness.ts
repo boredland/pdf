@@ -39,7 +39,7 @@ import {
   setSessionPassphrase,
   storeApiKey,
 } from "~/lib/api-keys";
-import { rewindToStage } from "~/lib/pipeline/rewind";
+import { rewindToStage, setPageRotationOverride } from "~/lib/pipeline/rewind";
 import { EXAMPLE_PDFS, loadExamplePdf } from "~/lib/examples";
 import {
   getExifOrientation,
@@ -123,7 +123,10 @@ declare global {
         clearPassphrase: typeof clearSessionPassphrase;
         hasPassphrase: typeof hasSessionPassphrase;
       };
-      rewind: { toStage: typeof rewindToStage };
+      rewind: {
+        toStage: typeof rewindToStage;
+        setRotationOverride: typeof setPageRotationOverride;
+      };
       example: {
         url: string;
         load: () => Promise<ArrayBuffer>;
@@ -222,7 +225,10 @@ export function installTestHarness(): void {
       clearPassphrase: clearSessionPassphrase,
       hasPassphrase: hasSessionPassphrase,
     },
-    rewind: { toStage: rewindToStage },
+    rewind: {
+      toStage: rewindToStage,
+      setRotationOverride: setPageRotationOverride,
+    },
     example: {
       url: EXAMPLE_PDFS.synthetic.url,
       // Back-compat: tests depending on exact OCR text pass through synthetic.
