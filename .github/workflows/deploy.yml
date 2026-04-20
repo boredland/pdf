@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +24,18 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
+
+  e2e:
+    # Runs in parallel with typecheck + deploy but doesn't block deploy —
+    # the suite is ~3 minutes today and we'd rather not stall every push
+    # behind it. Failures still surface on the commit status + PR.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
       - name: Run e2e tests
@@ -40,7 +52,7 @@ jobs:
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: ci
+    needs: typecheck
     runs-on: ubuntu-latest
     permissions:
       contents: read
