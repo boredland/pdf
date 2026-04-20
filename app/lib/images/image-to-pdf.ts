@@ -3,6 +3,7 @@
  */
 
 import { getExifOrientation, getRotationTransform } from "./exif-orientation";
+import { detectOrientationTesseract } from "./tesseract-orientation";
 
 /**
  * Detect rotation angle from image using edge detection (similar to deskew)
@@ -124,17 +125,29 @@ export async function convertImageToPdf(
     orientation = getExifOrientation(imageBytes);
   }
 
-  // If no EXIF rotation, try to detect rotation from image content
-  // Note: HoughLines-based detection only catches skew/small rotations (~±45°)
-  // 180° rotations without EXIF metadata will not be detected here.
-  // Future: Could add OCR-based rotation detection if needed.
+  // If no EXIF rotation, try multiple detection methods:
+  // 1. Fast: Tesseract OSD (Orientation and Script Detection) - catches 180° rotations
+  // 2. Fallback: HoughLines-based edge detection for skew/small rotations
   let rotationAngle = 0;
   const { angle: exifAngle } = getRotationTransform(orientation);
   if (exifAngle === 0) {
     try {
-      rotationAngle = await detectImageRotation(imageBytes, mimeType);
+      // First try Tesseract OSD - very fast and reliable for detecting page orientation
+      const tesseractResult = await detectOrientationTesseract(imageBytes);
+      if (tesseractResult.confidence > 50) {
+        rotationAngle = tesseractResult.angle;
+      } else {
+        // If Tesseract confidence is low, try HoughLines for skew detection
+        rotationAngle = await detectImageRotation(imageBytes, mimeType);
+      }
     } catch (error) {
       console.warn("Could not detect image rotation:", error);
+      // Fallback to HoughLines
+      try {
+        rotationAngle = await detectImageRotation(imageBytes, mimeType);
+      } catch (fallbackError) {
+        console.warn("HoughLines fallback also failed:", fallbackError);
+      }
     }
   }
 

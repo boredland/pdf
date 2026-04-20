@@ -1,0 +1,43 @@
+# OCR app — remaining work
+
+## Done (commits)
+- [x] Step 0  Scaffold                             75925b7
+- [x] Step 1  Storage + artifacts + SW             3b5231f
+- [x] Step 2  PDF ingest + render                  cf25c87
+- [x] Step 3  OpenCV preprocess                    314368d
+- [x] Step 4  Text-region detection                9dfb8ee
+- [x] Step 5  Tesseract OCR                        480db94
+- [x] Step 6  Gemini hosted provider               c7a90e7
+- [x] Step 7  MRC split (JBIG2 + JP2)              15dbb2d
+- [x] Step 7.5 Per-page detail pane                a1a967c
+- [x] Step 8  PDF builder + text layer             8d3a845
+- [x] Step 9  Orchestrator + resume + confirm      2ae9b5f
+- [x] Manual  cardinal.pdf example                 f12ffbd
+- [x] Manual  mask PNG optimization                dcba3f4
+- [x] Manual  Auto image rotation (EXIF+content)   bef25c2
+- [x] Manual  Document 180° rotation limitation    238966a
+
+## Step 10 — Polish (remaining)
+- [ ] Keyboard navigation across full UI (tab order, focus rings, shortcuts)
+- [ ] axe accessibility scan, zero WCAG AA violations
+- [ ] Visual regression screenshots: empty / ingest / mid-job / done / error
+- [ ] Cold-load → example job → reload offline → reopen → re-run page → export
+- [ ] Asset-cache pane polish (sizes, purge per-asset, online/offline state)
+- [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
+
+## Deferred follow-ups (from memory)
+- [ ] pino-style structured browser logging
+- [ ] Multi-provider readiness (Mistral OCR, Doubleword, Gemma) behind registry
+- [ ] Language detection (Kreuzberg-inspired)
+- [ ] Real JBIG2 / JP2 encoders (replace current stand-ins) — post-v1
+
+## Stretch (post-v1)
+- [ ] CRAFT ONNX text detector (swap MSER when better IoU proven)
+- [ ] Optional CORS proxy worker for blocked providers
+- [ ] Dewarping (book-spine curvature)
+- [ ] Batch import (ZIP / multi-PDF)
+- [ ] Export hOCR / ALTO XML
+
+## 180° rotation gap (open)
+- [ ] Investigate OSD (Tesseract orientation detection) or script-based
+      heuristic to catch upside-down scans lacking EXIF orientation
