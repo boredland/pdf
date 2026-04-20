@@ -1,6 +1,6 @@
 /**
- * Fast orientation detection using Tesseract.js
- * Analyzes OCR confidence to detect page rotation
+ * Fast orientation detection using Tesseract.js OSD
+ * OSD = Orientation and Script Detection (built-in Tesseract feature)
  */
 
 export interface TesseractOrientationResult {
@@ -9,11 +9,11 @@ export interface TesseractOrientationResult {
 }
 
 /**
- * Detect page orientation using Tesseract.js
- * Attempts to recognize text at normal and 180° rotations, comparing confidence
- * Higher confidence at 180° indicates upside-down page
+ * Detect page orientation using Tesseract.js OSD (Orientation and Script Detection)
+ * Built-in Tesseract method specifically for detecting page rotation
+ * Much faster than full OCR recognition
  * 
- * Returns angle in degrees to rotate page to correct orientation (0 or 180 primarily)
+ * Returns angle in degrees (0, 90, 180, 270) detected as needing rotation
  */
 export async function detectOrientationTesseract(
   pngBytes: Uint8Array,
@@ -22,41 +22,25 @@ export async function detectOrientationTesseract(
     const tesseract = await import("tesseract.js");
     const BASE = (import.meta as any).env.BASE_URL || "/";
 
-    const worker = await tesseract.createWorker(undefined, undefined, {
+    const blob = new Blob([Buffer.from(pngBytes)], { type: "image/png" });
+    
+    // Use Tesseract.js's built-in OSD (Orientation and Script Detection)
+    // This is faster and more reliable than trying to infer from text recognition
+    const result = await tesseract.detect(blob, {
       corePath: `${BASE}tesseract/`,
       workerPath: `${BASE}tesseract/worker.min.js`,
     });
 
-    try {
-      const blob = new Blob([Buffer.from(pngBytes)], { type: "image/png" });
-      
-      // Try to recognize at 0° and check layout
-      const result0 = await worker.recognize(blob);
-      
-      // Get confidence from first recognition
-      let confidence0 = 0;
-      if (result0.data?.text) {
-        // Use text length and potential confidence as proxy
-        confidence0 = Math.min(100, result0.data.text.length / 10);
-      }
+    // OSD returns: angle (0, 90, 180, 270) and confidence
+    const angle = result.data?.angle ?? 0;
+    const confidence = result.data?.confidence ?? 0;
 
-      // For 180° detection: if text is blank/gibberish, might be upside down
-      // Check if we got readable text
-      const textLength = result0.data?.text?.trim().length ?? 0;
-      
-      // If text is too short or empty, might be rotated
-      if (textLength < 5) {
-        // Text recognition failed - likely bad orientation
-        return { angle: 180, confidence: 60 };
-      }
-
-      // Got readable text - likely correct orientation
-      return { angle: 0, confidence: 80 };
-    } finally {
-      await worker.terminate();
-    }
+    return { 
+      angle: Math.round(angle) as 0 | 90 | 180 | 270,
+      confidence: Math.round(confidence * 100) // Convert to 0-100 scale
+    };
   } catch (error) {
-    console.warn("Tesseract orientation detection failed:", error);
+    console.warn("Tesseract OSD orientation detection failed:", error);
     return { angle: 0, confidence: 0 };
   }
 }
