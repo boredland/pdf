@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
+import { optimizeMaskPng } from "../lib/compression/optimize-mask";
 
 export type MrcPreset = "lossless" | "archival" | "compact";
 
@@ -285,7 +286,10 @@ const api = {
     const maskRgba = maskToRgba(mask, width, height);
     const maskCanvas = new OffscreenCanvas(width, height);
     maskCanvas.getContext("2d")!.putImageData(makeImageData(maskRgba, width, height), 0, 0);
-    const maskPngBytes = await encode(maskCanvas, "image/png");
+    let maskPngBytes = await encode(maskCanvas, "image/png");
+    
+    // Optimize mask with pure black/white thresholding for better compression
+    maskPngBytes = await optimizeMaskPng(maskPngBytes);
 
     const { canvas: composedCanvas, rgba: composedRgba } = await compose(
       bgStage.canvas,
