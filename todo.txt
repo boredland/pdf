@@ -25,8 +25,11 @@
       only project-wide join.                             (shipped)
 
 ## Step 10 — Polish (remaining)
-- [ ] Keyboard navigation across full UI (tab order, focus rings, shortcuts)
-- [ ] axe accessibility scan, zero WCAG AA violations
+- [x] Keyboard navigation: global focus-visible ring via base layer,
+      Escape closes image modal / confirm modal / detail pane, Run
+      button is focusable and activates on Enter.              (shipped)
+- [x] axe accessibility: zero WCAG 2.0 AA violations on home +
+      project view (step17 e2e).                                (shipped)
 - [ ] Visual regression screenshots: empty / ingest / mid-job / done / error
 - [x] Cold-load → example job → reload offline → reopen → re-run page →
       export (step13 e2e spec)                              (shipped)

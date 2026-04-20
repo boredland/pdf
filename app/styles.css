@@ -11,3 +11,23 @@ body,
 body {
   @apply bg-slate-950 text-slate-100 antialiased;
 }
+
+/*
+ * Default focus ring for every keyboard-reachable control. We omit it for
+ * mouse/pointer focus (focus-visible instead of focus) so we don't paint a
+ * ring around every button a user clicks. Sky-400 against slate-950
+ * measures ~8:1 contrast — comfortably above WCAG AA.
+ */
+@layer base {
+  :focus-visible {
+    @apply outline-2 outline outline-offset-2 outline-sky-400 rounded-sm;
+  }
+  /* Buttons that carry their own border already have their own rounding;
+     use ring instead so the focus cue follows the button shape. */
+  button:focus-visible,
+  a:focus-visible,
+  [role="tab"]:focus-visible,
+  summary:focus-visible {
+    @apply outline-none ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-950;
+  }
+}

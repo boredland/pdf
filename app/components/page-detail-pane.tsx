@@ -33,6 +33,15 @@ export function PageDetailPane({ project, pageIndex, onClose }: Props) {
     [project.id, pageIndex],
   );
 
+  // Escape closes the pane so the keyboard flow mirrors the modal dialogs.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   async function onRerun(stage: Exclude<Stage, "build">) {
     if (!page) return;
     setBusyStage(stage);

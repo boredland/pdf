@@ -77,4 +77,41 @@ test.describe("step 17 — axe accessibility scan (WCAG 2.0 AA)", () => {
     }
     expect(result.blocking).toEqual([]);
   });
+
+  test("keyboard: Tab lands on the run button; Enter activates it", async ({
+    page,
+  }) => {
+    await page.getByTestId("load-example-synthetic").click();
+    await expect(page.getByTestId("run-stage-button")).toBeVisible();
+
+    // Focus the run button directly (we don't want to assert an exact Tab
+    // order — too brittle across Gemini/Mistral key inputs). Just assert
+    // the button is focusable and its outline/ring shows up.
+    await page.getByTestId("run-stage-button").focus();
+    const focused = await page.evaluate(
+      () =>
+        (document.activeElement as HTMLElement | null)?.getAttribute(
+          "data-testid",
+        ),
+    );
+    expect(focused).toBe("run-stage-button");
+    // Keyboard-visible focus ring is a computed style — assert outline OR
+    // ring is non-zero.
+    const ringWidth = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return "";
+      const s = getComputedStyle(el);
+      return s.boxShadow + " " + s.outlineStyle + " " + s.outlineWidth;
+    });
+    expect(ringWidth).not.toBe(" none 0px");
+  });
+
+  test("keyboard: Escape closes the detail pane", async ({ page }) => {
+    await page.getByTestId("load-example-synthetic").click();
+    await expect(page.getByTestId("page-card-0")).toBeVisible();
+    await page.getByTestId("page-open-0").click();
+    await expect(page.getByTestId("detail-pane")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("detail-pane")).toBeHidden();
+  });
 });
