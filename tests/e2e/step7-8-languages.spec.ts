@@ -163,6 +163,11 @@ test.describe("languages — selector + download UI", () => {
     const hint = page.getByTestId("lang-script-hint");
     await expect(hint).toBeVisible({ timeout: 10_000 });
     await expect(hint).toHaveAttribute("data-script", /Latin/i);
+
+    // With Latin detected and only `eng` selected, at least one non-eng
+    // Latin suggestion should offer itself (`+deu`/`+fra`/`+spa`/...).
+    const suggestion = page.locator('[data-testid^="lang-suggest-"]').first();
+    await expect(suggestion).toBeVisible();
   });
 
   test("langPathFor routes eng-only to local, anything else to CDN", async ({ page }) => {

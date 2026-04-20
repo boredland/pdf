@@ -74,9 +74,9 @@
         b) Kreuzberg-style: run a tiny LSTM on a sampled strip of each
            page, vote across pages, pick the traineddata. Offline-safe
            once the model ships (~1 MB).
-- [ ] Once detection is in, auto-download the selected traineddata via
-      the existing SW cache path and add a "Detected: <lang>" pill in
-      the language selector.
+- [~] Once detection is in, auto-suggest a matching language in the
+      pill and let a one-click action download + select it. Tracked
+      below.
 
 ## Output compression
 - [x] Builder: embed mask + background separately (was: lossless PNG of

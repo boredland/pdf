@@ -106,14 +106,37 @@ export function LanguagesPanel({ project, disabled }: Props) {
         <h3 className="font-semibold text-slate-100">OCR languages (Tesseract)</h3>
         <div className="flex flex-wrap items-center gap-2">
           {scriptHint && (
-            <span
-              data-testid="lang-script-hint"
-              data-script={scriptHint.script}
-              className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-200"
-              title={`Tesseract OSD detected ${scriptHint.script} on ${scriptHint.pageCount} of ${scriptHint.totalPages} pages`}
-            >
-              detected: {scriptHint.script}
-            </span>
+            <ScriptHintPill
+              hint={scriptHint}
+              selected={selectedSet}
+              disabled={disabled || busy !== null}
+              onUseSuggestion={async (lang) => {
+                setError(null);
+                try {
+                  if (!LOCAL_PREBUILT_LANGS.has(lang.code)) {
+                    setBusy(lang.code);
+                    await downloadLanguage(lang.code, {
+                      onProgress: (p) =>
+                        setProgress((prev) => ({ ...prev, [lang.code]: p })),
+                    });
+                    setBusy(null);
+                  }
+                  await getDb().projects.update(project.id, {
+                    settings: {
+                      ...project.settings,
+                      ocr: {
+                        ...project.settings.ocr,
+                        language: joinLanguages([...selected, lang.code]),
+                      },
+                    },
+                  });
+                  await refreshCacheState();
+                } catch (err) {
+                  setBusy(null);
+                  setError(`${lang.code}: ${(err as Error).message}`);
+                }
+              }}
+            />
           )}
           <span className="text-[10px] uppercase tracking-wide text-slate-400">
             selected: {selected.length === 0 ? "—" : selected.join(" + ")}
@@ -233,17 +256,61 @@ function DownloadButton(props: {
   );
 }
 
+function ScriptHintPill({
+  hint,
+  selected,
+  disabled,
+  onUseSuggestion,
+}: {
+  hint: ScriptHint;
+  selected: Set<string>;
+  disabled: boolean;
+  onUseSuggestion: (lang: LanguageInfo) => void;
+}) {
+  // Offer up to 3 matching languages that aren't already selected. If
+  // they're all selected, the pill is purely informational.
+  const candidates = hint.suggestedLanguages
+    .filter((l) => !selected.has(l.code))
+    .slice(0, 3);
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span
+        data-testid="lang-script-hint"
+        data-script={hint.script}
+        className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-200"
+        title={`Tesseract OSD detected ${hint.script} on ${hint.pageCount} of ${hint.totalPages} pages`}
+      >
+        detected: {hint.script}
+      </span>
+      {candidates.map((lang) => (
+        <button
+          key={lang.code}
+          type="button"
+          disabled={disabled}
+          onClick={() => onUseSuggestion(lang)}
+          data-testid={`lang-suggest-${lang.code}`}
+          className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-60"
+          title={`Download (if needed) and add ${lang.name} to the OCR language set`}
+        >
+          + {lang.code}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface ScriptHint {
   script: string;
   pageCount: number;
   totalPages: number;
+  /** Matching languages from our curated list whose script lines up. */
+  suggestedLanguages: LanguageInfo[];
 }
 
 /**
  * Majority-vote OSD's script detection across preprocessed pages. Returns
  * the winning script if at least one page has a confident reading AND the
- * winning script covers more than half of the confident pages. The result
- * is purely informational for now — we don't auto-switch the language.
+ * winning script covers more than half of the confident pages.
  */
 function deriveScriptHint(pages: Page[]): ScriptHint | null {
   const scored: Record<string, number> = {};
@@ -260,5 +327,8 @@ function deriveScriptHint(pages: Page[]): ScriptHint | null {
   if (!winner) return null;
   const [script, pageCount] = winner;
   if (pageCount <= confidentPages / 2) return null;
-  return { script, pageCount, totalPages: pages.length };
+  const suggestedLanguages = LANGUAGES.filter((l) =>
+    l.script ? l.script.toLowerCase().includes(script.toLowerCase()) : false,
+  );
+  return { script, pageCount, totalPages: pages.length, suggestedLanguages };
 }
