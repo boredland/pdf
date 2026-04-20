@@ -7,15 +7,16 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
 jobs:
   typecheck:
+    # Cancel superseded typecheck runs as soon as a new commit lands on
+    # the same ref — no point spending CI on stale work.
+    concurrency:
+      group: typecheck-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +30,9 @@ jobs:
     # Runs in parallel with typecheck + deploy but doesn't block deploy —
     # the suite is ~3 minutes today and we'd rather not stall every push
     # behind it. Failures still surface on the commit status + PR.
+    concurrency:
+      group: e2e-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +57,12 @@ jobs:
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: typecheck
+    # Keep the GitHub Pages deployment single-flight per the Actions
+    # recommendation: let an in-flight deploy complete before the next
+    # one starts, rather than cancelling mid-publish.
+    concurrency:
+      group: pages-${{ github.ref }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: read

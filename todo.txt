@@ -33,11 +33,8 @@
       back-matter they don't want OCR'd). Needs: per-page "remove"
       control, invalidation of downstream artifacts for the removed
       index, and a re-index pass so page numbers stay contiguous.
-- [ ] Bump thumbnail resolution — 160px max-side is too crunchy on HiDPI
-      displays. Try 320/480 and measure the OPFS+thumbnail cost hit.
-      Lives in THUMB_MAX_SIDE constants across render/preprocess/mrc
-      workers. Keep the page-card thumb small but let the detail-pane
-      strip serve a sharper variant.
+- [x] Bump thumbnail resolution 160 → 320 across render/preprocess/mrc
+      (HiDPI crispness).                                    (shipped)
 
 ## Rotation detection without EXIF
 - [x] Tesseract OSD in preprocess: all four cardinal rotations
