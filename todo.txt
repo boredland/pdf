@@ -30,7 +30,10 @@
       button is focusable and activates on Enter.              (shipped)
 - [x] axe accessibility: zero WCAG 2.0 AA violations on home +
       project view (step17 e2e).                                (shipped)
-- [ ] Visual regression screenshots: empty / ingest / mid-job / done / error
+- [x] Visual regression: Playwright screenshot baselines for home-empty,
+      project-loaded, project-built. 1.5% pixel-ratio tolerance to allow
+      for rasterisation drift. Baselines live in
+      tests/e2e/step18-visual-regression.spec.ts-snapshots/.   (shipped)
 - [x] Cold-load → example job → reload offline → reopen → re-run page →
       export (step13 e2e spec)                              (shipped)
 - [x] Asset-cache pane polish: per-bucket rows with entry counts,
