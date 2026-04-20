@@ -5,6 +5,7 @@ import { createProjectFromBytes } from "~/lib/projects";
 import { runRenderPipeline, ensurePageRows } from "~/lib/pipeline/render-pipeline";
 import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
+import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
 import { rewindToStage } from "~/lib/pipeline/rewind";
 import { progressChannel, type ProgressEvent } from "~/lib/progress";
 import { EXAMPLE_PDF_NAME, loadExamplePdf } from "~/lib/examples";
@@ -50,6 +51,8 @@ export function ProjectView() {
       await runPreprocessPipeline(fresh, { signal: controller.signal });
       if (controller.signal.aborted) return;
       await runDetectPipeline(fresh, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      await runOcrPipeline(fresh, { signal: controller.signal });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -249,6 +252,7 @@ function PageGrid({
             data-render-status={page.status.render ? "done" : "pending"}
             data-preprocess-status={page.status.preprocess ? "done" : "pending"}
             data-detect-status={page.status.detect ? "done" : "pending"}
+            data-ocr-status={page.status.ocr ? "done" : "pending"}
             className="rounded-md border border-slate-800 bg-slate-900/60 p-2"
           >
             <div className="aspect-[3/4] overflow-hidden rounded bg-slate-800/60">
