@@ -8,6 +8,9 @@
  */
 
 import { createWorker } from "tesseract.js";
+import { logger } from "~/lib/logger";
+
+const log = logger.child({ module: "osd" });
 
 const BASE = import.meta.env.BASE_URL;
 const OSD_LANG_PATH = `${BASE}tesseract/`;
@@ -131,7 +134,7 @@ export async function detectOrientation(
       scriptConfidence,
     };
   } catch (err) {
-    console.warn("[osd] detection failed:", (err as Error).message);
+    log.warn({ evt: "osd_failed", err: (err as Error).message });
     return {
       ok: false,
       rawAngle: 0,

@@ -34,9 +34,13 @@ export async function loadExamplePdf(id: ExampleId = DEFAULT_EXAMPLE_ID): Promis
     // Graceful fallback: the scanned PDF is fetched at postinstall and could
     // be missing in a very fresh checkout before `bun install` completes.
     if (id === "scanned") {
-      console.warn(
-        `scanned example not available (${response.status}) — falling back to synthetic`,
-      );
+      const { logger } = await import("~/lib/logger");
+      logger.warn({
+        evt: "example_fallback",
+        requested: "scanned",
+        status: response.status,
+        fallback: "synthetic",
+      });
       return loadExamplePdf("synthetic");
     }
     throw new Error(`failed to load example PDF (${response.status})`);

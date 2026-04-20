@@ -1,11 +1,16 @@
 import type { OcrProvider } from "./types";
 import { tesseractProvider } from "./tesseract";
 import { geminiProvider } from "./gemini";
+import { mistralProvider } from "./mistral";
 
 // The mock provider (app/lib/providers/mock.ts) is NOT listed here. The
 // test harness registers it lazily when a spec opts in — keeps it out of
 // prod bundles' provider dropdown.
-const PROVIDERS: OcrProvider[] = [tesseractProvider, geminiProvider];
+const PROVIDERS: OcrProvider[] = [
+  tesseractProvider,
+  geminiProvider,
+  mistralProvider,
+];
 
 export function listProviders(): OcrProvider[] {
   return [...PROVIDERS];
