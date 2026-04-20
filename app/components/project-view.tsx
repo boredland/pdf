@@ -3,8 +3,11 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { getDb, type Page, type Project } from "~/lib/storage/db";
 import { createProjectFromBytes } from "~/lib/projects";
 import { runRenderPipeline, ensurePageRows } from "~/lib/pipeline/render-pipeline";
+import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
+import { rewindToStage } from "~/lib/pipeline/rewind";
 import { progressChannel, type ProgressEvent } from "~/lib/progress";
 import { EXAMPLE_PDF_NAME, loadExamplePdf } from "~/lib/examples";
+import { SettingsPanel } from "~/components/settings-panel";
 
 export function ProjectView() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -42,6 +45,8 @@ export function ProjectView() {
       const fresh = await getDb().projects.get(next.id);
       if (!fresh) throw new Error("project vanished");
       await runRenderPipeline(fresh, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      await runPreprocessPipeline(fresh, { signal: controller.signal });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -66,6 +71,23 @@ export function ProjectView() {
   const onAbort = useCallback(() => {
     abortRef.current?.abort();
   }, []);
+
+  const onReprocess = useCallback(async () => {
+    if (!project) return;
+    setError(null);
+    setIsBusy(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      await rewindToStage(project.id, "preprocess");
+      await runPreprocessPipeline(project, { signal: controller.signal });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsBusy(false);
+      abortRef.current = null;
+    }
+  }, [project]);
 
   const pageList = pages ?? [];
 
@@ -94,17 +116,30 @@ export function ProjectView() {
                 {project.pageCount} page{project.pageCount === 1 ? "" : "s"} · {project.id}
               </p>
             </div>
-            {isBusy && (
-              <button
-                type="button"
-                onClick={onAbort}
-                data-testid="abort-button"
-                className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1 text-sm text-red-300 hover:bg-red-500/20"
-              >
-                Abort
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {!isBusy && (
+                <button
+                  type="button"
+                  onClick={() => void onReprocess()}
+                  data-testid="reprocess-button"
+                  className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1 text-sm text-slate-200 hover:bg-slate-700"
+                >
+                  Re-run preprocess
+                </button>
+              )}
+              {isBusy && (
+                <button
+                  type="button"
+                  onClick={onAbort}
+                  data-testid="abort-button"
+                  className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1 text-sm text-red-300 hover:bg-red-500/20"
+                >
+                  Abort
+                </button>
+              )}
+            </div>
           </header>
+          <SettingsPanel project={project} disabled={isBusy} />
           <PageGrid pages={pageList} running={runningStages} />
         </section>
       )}
@@ -208,6 +243,8 @@ function PageGrid({
             key={page.id}
             data-testid={`page-card-${page.index}`}
             data-page-status={status}
+            data-render-status={page.status.render ? "done" : "pending"}
+            data-preprocess-status={page.status.preprocess ? "done" : "pending"}
             className="rounded-md border border-slate-800 bg-slate-900/60 p-2"
           >
             <div className="aspect-[3/4] overflow-hidden rounded bg-slate-800/60">

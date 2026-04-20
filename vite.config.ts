@@ -80,7 +80,7 @@ export default defineConfig({
     format: "es",
   },
   optimizeDeps: {
-    exclude: ["mupdf"],
+    exclude: ["mupdf", "@techstark/opencv-js"],
   },
   build: {
     target: "es2022",
