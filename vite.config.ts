@@ -23,7 +23,8 @@ export default defineConfig({
       strategies: "generateSW",
       devOptions: { enabled: false },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,svg,wasm}"],
+        globPatterns: ["**/*.{js,css,html,ico,svg,wasm}", "examples/**/*.pdf"],
+        maximumFileSizeToCacheInBytes: 32 * 1024 * 1024,
         navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
@@ -74,6 +75,18 @@ export default defineConfig({
     alias: {
       "~": path.resolve(__dirname, "app"),
     },
+  },
+  worker: {
+    format: "es",
+  },
+  optimizeDeps: {
+    exclude: ["mupdf"],
+  },
+  build: {
+    target: "es2022",
+  },
+  esbuild: {
+    target: "es2022",
   },
   server: {
     port: 5173,

@@ -163,13 +163,25 @@ test.describe("step 1 — storage, artifact model, service worker", () => {
     await pill.click();
     await expect(page.getByTestId("assets-pane")).toBeVisible();
 
-    const beforeText = await page.getByTestId("assets-entries").textContent();
-    const before = Number.parseInt(beforeText ?? "0", 10);
-    expect(before).toBeGreaterThan(0);
+    await expect
+      .poll(
+        async () =>
+          Number.parseInt(
+            (await page.getByTestId("assets-entries").textContent()) ?? "0",
+            10,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
 
     await page.getByTestId("assets-purge").click();
     await expect
-      .poll(async () => Number.parseInt((await page.getByTestId("assets-entries").textContent()) ?? "0", 10))
+      .poll(async () =>
+        Number.parseInt(
+          (await page.getByTestId("assets-entries").textContent()) ?? "0",
+          10,
+        ),
+      )
       .toBe(0);
   });
 });
