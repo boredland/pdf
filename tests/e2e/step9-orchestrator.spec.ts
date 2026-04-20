@@ -11,6 +11,9 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await waitForHarness(page);
+    await page.evaluate(() =>
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock"),
+    );
   });
 
   test("job progress advances as each stage completes and pegs at 100% after build", async ({

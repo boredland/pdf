@@ -25,6 +25,12 @@ test.describe("step 8 — searchable PDF builder", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await waitForHarness(page);
+    // Default to the mock OCR provider: every test here except the one
+    // asserting round-tripped real text opts in individually if it needs
+    // Tesseract.
+    await page.evaluate(() =>
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock"),
+    );
   });
 
   test("build produces a valid PDF with an invisible text layer that mupdf can read", async ({
@@ -57,6 +63,11 @@ test.describe("step 8 — searchable PDF builder", () => {
   });
 
   test("invisible text is extractable from the built PDF", async ({ page }) => {
+    // This test verifies real OCR text round-trips through the invisible
+    // layer, so it must use Tesseract rather than the mock default.
+    await page.evaluate(() =>
+      window.__pdfApp!.testing.setDefaultOcrProvider("tesseract"),
+    );
     const projectId = await bootstrapAllStages(page, "build-text");
 
     const extracted = await page.evaluate(async (id) => {

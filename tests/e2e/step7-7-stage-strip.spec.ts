@@ -21,6 +21,9 @@ test.describe("step 7.7 — per-stage thumbs + image modal", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await waitForHarness(page);
+    await page.evaluate(() =>
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock"),
+    );
   });
 
   test("stage strip is hidden by default, expands via <details>", async ({ page }) => {

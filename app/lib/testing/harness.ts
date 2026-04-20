@@ -124,6 +124,14 @@ declare global {
         load: () => Promise<ArrayBuffer>;
         loadById: typeof loadExamplePdf;
       };
+      testing: {
+        /**
+         * Mutate DEFAULT_SETTINGS.ocr.providerId. Affects every subsequent
+         * createProjectFromBytes call in this browser context. Used by e2e
+         * specs to swap in the "mock" provider and bypass real OCR.
+         */
+        setDefaultOcrProvider: (id: string) => void;
+      };
     };
     __pdfRenderCallCount?: number;
     __pdfPreprocessCallCount?: number;
@@ -205,6 +213,11 @@ export function installTestHarness(): void {
       // Back-compat: tests depending on exact OCR text pass through synthetic.
       load: () => loadExamplePdf("synthetic"),
       loadById: loadExamplePdf,
+    },
+    testing: {
+      setDefaultOcrProvider: (id: string) => {
+        DEFAULT_SETTINGS.ocr.providerId = id;
+      },
     },
   };
 }
