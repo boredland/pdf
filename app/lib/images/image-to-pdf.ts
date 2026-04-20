@@ -7,6 +7,9 @@ import { getExifOrientation, getRotationTransform } from "./exif-orientation";
 /**
  * Detect rotation angle from image using edge detection (similar to deskew)
  * Returns angle in degrees to rotate image to make text horizontal
+ * 
+ * Note: Only detects skew/small rotations via edge detection.
+ * 180° rotations without EXIF require OCR-based detection.
  */
 export async function detectImageRotation(
   imageBytes: Uint8Array,
@@ -39,7 +42,7 @@ export async function detectImageRotation(
     let gray = new cv.Mat();
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-    // Detect skew angle
+    // Detect skew angle (handles ~±45° skew)
     const angle = measureSkewFromGray(cv, gray);
 
     // Cleanup
@@ -122,6 +125,9 @@ export async function convertImageToPdf(
   }
 
   // If no EXIF rotation, try to detect rotation from image content
+  // Note: HoughLines-based detection only catches skew/small rotations (~±45°)
+  // 180° rotations without EXIF metadata will not be detected here.
+  // Future: Could add OCR-based rotation detection if needed.
   let rotationAngle = 0;
   const { angle: exifAngle } = getRotationTransform(orientation);
   if (exifAngle === 0) {
