@@ -17,4 +17,17 @@ export async function rewindToStage(projectId: string, stage: Stage): Promise<vo
     if (stage === "render") update.thumbnailDataUrl = undefined;
     await db.pages.update(page.id, update);
   }
+
+  // The build artifact is project-scoped, not page-scoped — iterate at the
+  // project level when build is downstream of the rewind target. Dexie's
+  // `update({ build: undefined })` is a no-op (undefined means "don't
+  // touch"), so re-put the project without the build field to drop it.
+  if (downstream.includes("build")) {
+    const project = await db.projects.get(projectId);
+    if (project?.build) {
+      await removeFile(project.build.artifactPath).catch(() => undefined);
+      const { build: _dropped, ...rest } = project;
+      await db.projects.put(rest);
+    }
+  }
 }

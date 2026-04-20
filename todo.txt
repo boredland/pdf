@@ -23,9 +23,13 @@
 - [ ] Keyboard navigation across full UI (tab order, focus rings, shortcuts)
 - [ ] axe accessibility scan, zero WCAG AA violations
 - [ ] Visual regression screenshots: empty / ingest / mid-job / done / error
-- [ ] Cold-load → example job → reload offline → reopen → re-run page → export
+- [x] Cold-load → example job → reload offline → reopen → re-run page →
+      export (step13 e2e spec)                              (shipped)
 - [ ] Asset-cache pane polish (sizes, purge per-asset, online/offline state)
 - [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
+- [ ] Display original vs. built PDF size (and the delta) on the project
+      header so users see the MRC compression payoff (or penalty) at a
+      glance. Plain bytes, plus a +/-% readout.
 
 ## Rotation detection without EXIF
 - [x] Tesseract OSD in preprocess: all four cardinal rotations
