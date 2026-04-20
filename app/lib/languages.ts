@@ -86,12 +86,59 @@ export async function isLanguageCached(code: string): Promise<boolean> {
   return false;
 }
 
-export async function downloadLanguage(code: string): Promise<void> {
+export interface DownloadProgress {
+  /** Bytes received so far. */
+  loaded: number;
+  /** Total bytes if the server sent Content-Length, otherwise null. */
+  total: number | null;
+  /** Fraction 0..1 or null if total is unknown. */
+  ratio: number | null;
+}
+
+export interface DownloadOptions {
+  onProgress?: (progress: DownloadProgress) => void;
+  signal?: AbortSignal;
+}
+
+export async function downloadLanguage(
+  code: string,
+  options: DownloadOptions = {},
+): Promise<void> {
   const url = traineddataUrl(code);
   // Kick a real fetch so the service worker's runtime cache picks it up.
-  const res = await fetch(url, { cache: "reload" });
+  const res = await fetch(url, { cache: "reload", signal: options.signal });
   if (!res.ok) throw new Error(`failed to download ${code} (${res.status})`);
-  // Drain the body so the fetch actually completes and SW commits the cache
-  // write — some browsers short-circuit otherwise.
-  await res.arrayBuffer();
+  const totalHeader = res.headers.get("Content-Length");
+  const total = totalHeader ? Number.parseInt(totalHeader, 10) || null : null;
+
+  const emit = (loaded: number) => {
+    options.onProgress?.({
+      loaded,
+      total,
+      ratio: total ? Math.min(1, loaded / total) : null,
+    });
+  };
+  emit(0);
+
+  if (!res.body) {
+    // Server didn't give us a stream (e.g. some proxies in tests). Drain
+    // via arrayBuffer and emit a single "done" event.
+    const buf = await res.arrayBuffer();
+    emit(buf.byteLength);
+    return;
+  }
+
+  const reader = res.body.getReader();
+  let loaded = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      loaded += value.byteLength;
+      emit(loaded);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  emit(loaded);
 }

@@ -234,7 +234,12 @@ export interface TextRegion {
 }
 
 export interface DetectInput {
-  pngBytes: ArrayBuffer;
+  /** preprocessed (deskewed, binarised) page bytes used for region analysis */
+  preprocessedPngBytes: ArrayBuffer;
+  /** full-colour render, rotated to match the preprocessed frame for overlay */
+  renderPngBytes: ArrayBuffer;
+  /** skew angle applied by preprocess — used to rotate the render */
+  skewAngleDegrees: number;
   pageIndex: number;
 }
 
@@ -318,21 +323,33 @@ function detectTextRegionsImpl(
 const api = {
   async detect(input: DetectInput): Promise<DetectOutput> {
     const { cv } = (await loadOpenCv()) as { cv: CvAny };
-    const imageData = await decodePng(input.pngBytes);
-    const src = cv.matFromImageData(imageData);
-    let gray: CvAny | null = null;
+    // Analyze the deskewed/binarised preprocessed image so the boxes land in
+    // the same coordinate frame as the OCR output and MRC mask.
+    const preImageData = await decodePng(input.preprocessedPngBytes);
+    const preSrc = cv.matFromImageData(preImageData);
+    let preGray: CvAny | null = null;
     let binary: CvAny | null = null;
+    // Build the overlay on the render rotated to match the preprocessed frame
+    // so the axis-aligned bboxes actually align with the text.
+    const renderImageData = await decodePng(input.renderPngBytes);
+    const renderSrc = cv.matFromImageData(renderImageData);
+    let rotatedRender: CvAny | null = null;
     try {
-      gray = new cv.Mat();
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      preGray = new cv.Mat();
+      cv.cvtColor(preSrc, preGray, cv.COLOR_RGBA2GRAY);
       binary = new cv.Mat();
-      cv.threshold(gray, binary, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+      cv.threshold(preGray, binary, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
       const { regions, drawOn } = detectTextRegionsImpl(cv, binary);
 
-      drawOn(src);
-      const width = src.cols;
-      const height = src.rows;
-      const rgba = new Uint8ClampedArray(src.data);
+      const skew = input.skewAngleDegrees ?? 0;
+      if (Math.abs(skew) > 0.05) {
+        rotatedRender = rotate(cv, renderSrc, skew);
+      }
+      const overlaySrc = rotatedRender ?? renderSrc;
+      drawOn(overlaySrc);
+      const width = overlaySrc.cols;
+      const height = overlaySrc.rows;
+      const rgba = new Uint8ClampedArray(overlaySrc.data);
       const [overlayPng, overlayDataUrl] = await Promise.all([
         encodePng(rgba, width, height),
         encodeThumbnail(rgba, width, height),
@@ -351,9 +368,11 @@ const api = {
         [transferable],
       );
     } finally {
-      gray?.delete();
+      preGray?.delete();
       binary?.delete();
-      src.delete();
+      preSrc.delete();
+      rotatedRender?.delete();
+      renderSrc.delete();
     }
   },
 

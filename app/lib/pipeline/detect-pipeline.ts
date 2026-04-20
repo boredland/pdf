@@ -79,10 +79,22 @@ export async function runDetectPipeline(
     });
 
     try {
-      const renderBlob = await readBlob(page.status.render?.artifactPath ?? "");
+      const [renderBlob, preBlob] = await Promise.all([
+        readBlob(page.status.render?.artifactPath ?? ""),
+        readBlob(page.status.preprocess.artifactPath),
+      ]);
       if (!renderBlob) throw new Error("render artifact missing — cannot overlay");
-      const pngBytes = await renderBlob.arrayBuffer();
-      const result = await detectPage({ pngBytes, pageIndex });
+      if (!preBlob) throw new Error("preprocess artifact missing — cannot analyse");
+      const [renderBytes, preBytes] = await Promise.all([
+        renderBlob.arrayBuffer(),
+        preBlob.arrayBuffer(),
+      ]);
+      const result = await detectPage({
+        renderPngBytes: renderBytes,
+        preprocessedPngBytes: preBytes,
+        skewAngleDegrees: page.status.preprocess.skewAngleDegrees ?? 0,
+        pageIndex,
+      });
 
       if (isAborted(options.signal)) {
         emitProgress({

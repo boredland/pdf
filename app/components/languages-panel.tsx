@@ -18,9 +18,16 @@ interface Props {
 
 type CacheState = "checking" | "cached" | "missing";
 
+interface DownloadState {
+  loaded: number;
+  total: number | null;
+  ratio: number | null;
+}
+
 export function LanguagesPanel({ project, disabled }: Props) {
   const [cacheState, setCacheState] = useState<Record<string, CacheState>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Record<string, DownloadState>>({});
   const [error, setError] = useState<string | null>(null);
 
   const selected = parseLanguages(project.settings.ocr.language);
@@ -45,14 +52,33 @@ export function LanguagesPanel({ project, disabled }: Props) {
   async function onDownload(lang: LanguageInfo) {
     setError(null);
     setBusy(lang.code);
+    setProgress((prev) => ({ ...prev, [lang.code]: { loaded: 0, total: null, ratio: 0 } }));
     try {
-      await downloadLanguage(lang.code);
+      await downloadLanguage(lang.code, {
+        onProgress: (p) => {
+          setProgress((prev) => ({ ...prev, [lang.code]: p }));
+        },
+      });
       await refreshCacheState();
     } catch (err) {
       setError(`${lang.code}: ${(err as Error).message}`);
     } finally {
       setBusy(null);
+      // Keep the final progress visible briefly so "100%" registers, then clear.
+      window.setTimeout(() => {
+        setProgress((prev) => {
+          const next = { ...prev };
+          delete next[lang.code];
+          return next;
+        });
+      }, 600);
     }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   async function toggleSelect(code: string, checked: boolean) {
@@ -121,20 +147,69 @@ export function LanguagesPanel({ project, disabled }: Props) {
                   cached
                 </span>
               ) : (
-                <button
-                  type="button"
+                <DownloadButton
+                  lang={lang}
+                  busy={isBusy}
+                  progress={progress[lang.code]}
+                  disabled={!!disabled}
                   onClick={() => void onDownload(lang)}
-                  disabled={disabled || isBusy}
-                  data-testid={`lang-download-${lang.code}`}
-                  className="rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-200 hover:bg-slate-700 disabled:opacity-60"
-                >
-                  {isBusy ? "downloading…" : "download"}
-                </button>
+                  formatBytes={formatBytes}
+                />
               )}
             </li>
           );
         })}
       </ul>
     </section>
+  );
+}
+
+function DownloadButton(props: {
+  lang: LanguageInfo;
+  busy: boolean;
+  progress?: DownloadState;
+  disabled: boolean;
+  onClick: () => void;
+  formatBytes: (bytes: number) => string;
+}) {
+  const { lang, busy, progress, disabled, onClick, formatBytes } = props;
+
+  // Progress bar modes:
+  // - ratio known (Content-Length present) → filled bar from 0..100%
+  // - ratio unknown but bytes flowing → show bytes downloaded, bar stays at 50%
+  //   as an activity indicator
+  const ratio = progress?.ratio ?? null;
+  const loaded = progress?.loaded ?? 0;
+  const indicator = busy && ratio === null && loaded > 0;
+
+  let label: string;
+  if (!busy) label = "download";
+  else if (ratio !== null) label = `${Math.round(ratio * 100)}%`;
+  else if (loaded > 0) label = formatBytes(loaded);
+  else label = "starting…";
+
+  const fillPercent = busy ? (ratio !== null ? ratio * 100 : indicator ? 50 : 10) : 0;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      data-testid={`lang-download-${lang.code}`}
+      data-progress={
+        busy ? (ratio !== null ? ratio.toFixed(3) : "indeterminate") : "idle"
+      }
+      aria-label={busy ? `Downloading ${lang.name}, ${label}` : `Download ${lang.name}`}
+      className="relative min-w-[84px] overflow-hidden rounded border border-slate-700 bg-slate-800 text-[10px] text-slate-200 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-80"
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-0 left-0 bg-sky-500/40 ${
+          indicator ? "animate-pulse" : ""
+        } transition-[width] duration-150`}
+        style={{ width: `${fillPercent}%` }}
+      />
+      <span className="relative block px-2 py-0.5 tabular-nums">{label}</span>
+    </button>
   );
 }

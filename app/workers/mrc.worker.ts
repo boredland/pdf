@@ -57,7 +57,11 @@ function toCanvasRotated(
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, bitmap.width, bitmap.height);
   ctx.translate(bitmap.width / 2, bitmap.height / 2);
-  ctx.rotate((angleDegrees * Math.PI) / 180);
+  // OpenCV's getRotationMatrix2D(angle) rotates counter-clockwise for
+  // positive angles; Canvas 2D's rotate(rad) goes clockwise. Preprocess
+  // deskews via OpenCV — to reproduce the same transform on the canvas side
+  // we negate the angle.
+  ctx.rotate((-angleDegrees * Math.PI) / 180);
   ctx.translate(-bitmap.width / 2, -bitmap.height / 2);
   ctx.drawImage(bitmap, 0, 0);
   return { canvas, ctx };
