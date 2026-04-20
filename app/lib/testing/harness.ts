@@ -4,7 +4,12 @@ import { wrapSecret, unwrapSecret } from "~/lib/storage/keys";
 import { getCacheStatus, purgeCaches } from "~/lib/cache/register-sw";
 import { settingsHash, artifactPath } from "~/lib/artifacts";
 import { DEFAULT_SETTINGS } from "~/lib/storage/db";
-import { createProjectFromBytes, listProjects, getProject } from "~/lib/projects";
+import {
+  createProjectFromBytes,
+  getProject,
+  listProjects,
+  removePage,
+} from "~/lib/projects";
 import {
   ensurePageRows,
   runRenderPipeline,
@@ -67,6 +72,7 @@ declare global {
         createProjectFromBytes: typeof createProjectFromBytes;
         listProjects: typeof listProjects;
         getProject: typeof getProject;
+        removePage: typeof removePage;
       };
       render: {
         ensurePageRows: typeof ensurePageRows;
@@ -169,7 +175,7 @@ export function installTestHarness(): void {
     keys: { wrapSecret, unwrapSecret },
     cache: { getCacheStatus, purgeCaches },
     artifacts: { settingsHash, artifactPath, DEFAULT_SETTINGS },
-    projects: { createProjectFromBytes, listProjects, getProject },
+    projects: { createProjectFromBytes, listProjects, getProject, removePage },
     render: {
       ensurePageRows,
       runRenderPipeline,

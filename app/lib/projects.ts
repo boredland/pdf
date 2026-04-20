@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, getDb, type Project } from "~/lib/storage/db";
-import { writeFile } from "~/lib/storage/opfs";
+import { removeFile, writeFile } from "~/lib/storage/opfs";
 import {
   convertImageToPdf,
   isImageFile,
@@ -62,4 +62,48 @@ export async function getProject(id: string): Promise<Project | undefined> {
 
 export async function listProjects(): Promise<Project[]> {
   return getDb().projects.orderBy("createdAt").reverse().toArray();
+}
+
+/**
+ * Remove a single page from a project. Wipes every artifact the page
+ * owned (render, preprocess, detect, ocr, mrc and their overlays), drops
+ * the page row, decrements project.pageCount, and invalidates
+ * project.build (the page-count changed, so the prior build is stale).
+ *
+ * Page indices are NOT renumbered on disk — the UI displays a
+ * display-position derived from the sorted list, so a hole in the raw
+ * index range is invisible to the user.
+ */
+export async function removePage(
+  projectId: string,
+  pageIndex: number,
+): Promise<void> {
+  const db = getDb();
+  const pageKey = `${projectId}:${pageIndex}`;
+  const page = await db.pages.get(pageKey);
+  const project = await db.projects.get(projectId);
+  if (!project || !page) return;
+
+  // Page-owned artifact files.
+  const paths = new Set<string>();
+  for (const status of Object.values(page.status ?? {})) {
+    if (!status) continue;
+    if (status.artifactPath) paths.add(status.artifactPath);
+    if (status.overlayPath) paths.add(status.overlayPath);
+  }
+  await Promise.all(
+    [...paths].map((p) => removeFile(p).catch(() => undefined)),
+  );
+
+  await db.pages.delete(pageKey);
+
+  // project.build is project-scoped and conceptually covers all pages,
+  // so dropping a page invalidates it. Use put so Dexie actually clears
+  // the optional field.
+  const { build, ...rest } = project;
+  if (build) await removeFile(build.artifactPath).catch(() => undefined);
+  await db.projects.put({
+    ...rest,
+    pageCount: Math.max(0, project.pageCount - 1),
+  });
 }

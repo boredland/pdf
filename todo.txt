@@ -39,10 +39,10 @@
 - [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
 - [x] Display original vs. built PDF size (and the delta) on the project
       header so users see the MRC compression payoff (or penalty).
-- [ ] Let users drop pages from the project (e.g. blank cover pages,
-      back-matter they don't want OCR'd). Needs: per-page "remove"
-      control, invalidation of downstream artifacts for the removed
-      index, and a re-index pass so page numbers stay contiguous.
+- [x] Per-page "remove" control. Wipes the page's OPFS artifacts,
+      decrements pageCount, and invalidates project.build. Indices
+      stay stable on disk but the UI shows contiguous display-position
+      numbering, so removal is visually seamless.         (shipped)
 - [x] Bump thumbnail resolution 160 → 320 across render/preprocess/mrc
       (HiDPI crispness).                                    (shipped)
 
@@ -92,6 +92,13 @@
       viewers avoid compositing cost.
 - [ ] Skip MRC split entirely for pure-B&W pages — emit a single bitonal
       image. Saves the background-layer bytes.
+- [ ] cardinal.pdf still compresses at ~12× source even on compact
+      (75.1 KB → 913.5 KB = +1117%). Mixed text+photo pages defeat
+      the current MRC split: the background is already JPEG-compressed
+      in the source, so re-encoding at 0.5 quality isn't a gain, and
+      the mask captures less because photo regions have no "text to
+      mask". Investigate: detect photo-dominated pages and drop the
+      mask entirely (just re-embed the source image).
 - [ ] Investigate zstd PDF stream filtering (PDF 2.0 feature) for
       non-image streams — mupdf support TBD.
 

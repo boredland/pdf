@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getDb, type Page, type Project } from "~/lib/storage/db";
-import { createProjectFromBytes } from "~/lib/projects";
+import { createProjectFromBytes, removePage } from "~/lib/projects";
 import { runRenderPipeline, ensurePageRows } from "~/lib/pipeline/render-pipeline";
 import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
@@ -238,6 +238,17 @@ export function ProjectView() {
             pages={pageList}
             running={runningStages}
             onOpen={(idx) => setOpenPageIndex(idx)}
+            onRemove={async (idx) => {
+              if (!project) return;
+              if (
+                !window.confirm(
+                  `Remove page ${idx + 1}? This drops its artifacts and invalidates the built PDF.`,
+                )
+              ) {
+                return;
+              }
+              await removePage(project.id, idx);
+            }}
           />
           {openPageIndex !== null && (
             <PageDetailPane
@@ -382,10 +393,12 @@ function PageGrid({
   pages,
   running,
   onOpen,
+  onRemove,
 }: {
   pages: Page[];
   running: Map<number, ProgressEvent>;
   onOpen: (index: number) => void;
+  onRemove: (index: number) => void | Promise<void>;
 }) {
   if (pages.length === 0) {
     return (
@@ -399,7 +412,7 @@ function PageGrid({
       className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
       data-testid="page-grid"
     >
-      {pages.map((page) => {
+      {pages.map((page, displayIndex) => {
         const runtime = running.get(page.index);
         const status =
           runtime?.kind === "stage" && runtime.stage === "render"
@@ -411,6 +424,7 @@ function PageGrid({
           <li
             key={page.id}
             data-testid={`page-card-${page.index}`}
+            data-display-index={displayIndex}
             data-page-status={status}
             data-render-status={page.status.render ? "done" : "pending"}
             data-preprocess-status={page.status.preprocess ? "done" : "pending"}
@@ -440,8 +454,17 @@ function PageGrid({
                 )}
               </div>
               <p className="mt-1 text-center text-[10px] text-slate-500">
-                page {page.index + 1} · {status}
+                page {displayIndex + 1} · {status}
               </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => void onRemove(page.index)}
+              data-testid={`page-remove-${page.index}`}
+              className="mt-1 w-full rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400 hover:bg-red-500/20 hover:text-red-300"
+              title="Remove this page from the project"
+            >
+              remove
             </button>
             <details className="group mt-1" data-testid={`page-details-${page.index}`}>
               <summary

@@ -37,7 +37,17 @@ export async function runStage(
   stage: Stage,
   options: RunStageOptions = {},
 ): Promise<void> {
-  return RUNNERS[stage](project, options);
+  if (stage === "build" || options.pageIndices) {
+    return RUNNERS[stage](project, options);
+  }
+  // Default indices = whatever pages actually exist. Keeps removePage
+  // working without the callers having to thread pageIndices around.
+  const pageIndices = (
+    await getDb().pages.where({ projectId: project.id }).toArray()
+  )
+    .map((r) => r.index)
+    .sort((a, b) => a - b);
+  return RUNNERS[stage](project, { ...options, pageIndices });
 }
 
 /**
@@ -59,9 +69,18 @@ export async function runFromStage(
   const runBuildAfter =
     remainingStages.includes("build") && !options.pageIndices;
 
-  const pageIndices =
-    options.pageIndices ??
-    [...Array.from({ length: project.pageCount }, (_, i) => i)];
+  // Read the actual page indices from the DB so a removePage call (which
+  // leaves a hole in the [0, pageCount) range) doesn't send us chasing a
+  // deleted row.
+  let pageIndices: number[];
+  if (options.pageIndices) {
+    pageIndices = options.pageIndices;
+  } else {
+    const rows = await getDb()
+      .pages.where({ projectId: project.id })
+      .toArray();
+    pageIndices = rows.map((r) => r.index).sort((a, b) => a - b);
+  }
 
   // Fan out per-page DAGs. Promise.all gives every page to the JS event
   // loop at once; individual workers serialise internally (OpenCV, mupdf)
