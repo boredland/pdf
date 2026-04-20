@@ -84,13 +84,20 @@ export async function runPreprocessPipeline(
       const pngBytes = await renderBlob.arrayBuffer();
 
       // Rotation sources, in priority order: explicit per-page override,
-      // then OSD detection, then no rotation.
+      // then OSD detection, then no rotation. Capture OSD's script hint
+      // along the way so the UI can offer a language suggestion.
       let osdAngleDegrees: 0 | 90 | 180 | 270 = 0;
+      let osdScript: string | undefined;
+      let osdScriptConfidence: number | undefined;
       if (page.rotationOverride !== undefined) {
         osdAngleDegrees = page.rotationOverride;
       } else if (project.settings.preprocess.orientationDetect) {
         const osd = await detectOrientation(pngBytes);
         osdAngleDegrees = osd.angle;
+        if (osd.script) {
+          osdScript = osd.script;
+          osdScriptConfidence = osd.scriptConfidence;
+        }
       }
 
       const result = await preprocessPage({
@@ -135,6 +142,8 @@ export async function runPreprocessPipeline(
             sizeBytes: result.pngBytes.byteLength,
             skewAngleDegrees: result.skewAngleDegrees,
             osdAngleDegrees: result.osdAngleDegrees,
+            osdScript,
+            osdScriptConfidence,
           },
         },
         thumbnailDataUrl: result.thumbnailDataUrl,

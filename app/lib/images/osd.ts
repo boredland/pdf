@@ -26,6 +26,9 @@ export interface OsdResult {
   /** Angle we'll actually apply in preprocess. */
   angle: AppliedRotation;
   confidence: number;
+  /** Detected script label (e.g. "Latin", "Cyrillic", "Han"). */
+  script: string | null;
+  scriptConfidence: number;
   /** `true` iff the OSD call succeeded within the timeout. */
   ok: boolean;
 }
@@ -93,6 +96,8 @@ export async function detectOrientation(
       data?: {
         orientation_degrees?: number;
         orientation_confidence?: number;
+        script?: string;
+        script_confidence?: number;
         // Older tesseract.js versions used {angle, confidence}
         angle?: number;
         confidence?: number;
@@ -103,15 +108,38 @@ export async function detectOrientation(
       result.data?.orientation_degrees ?? result.data?.angle ?? 0;
     const confidence =
       result.data?.orientation_confidence ?? result.data?.confidence ?? 0;
+    const script = result.data?.script ?? null;
+    const scriptConfidence = result.data?.script_confidence ?? 0;
 
     const rawAngle = normaliseAngle(rawAngleNumeric);
     if (confidence < MIN_CONFIDENCE) {
-      return { ok: true, rawAngle, angle: 0, confidence };
+      return {
+        ok: true,
+        rawAngle,
+        angle: 0,
+        confidence,
+        script,
+        scriptConfidence,
+      };
     }
-    return { ok: true, rawAngle, angle: rawAngle, confidence };
+    return {
+      ok: true,
+      rawAngle,
+      angle: rawAngle,
+      confidence,
+      script,
+      scriptConfidence,
+    };
   } catch (err) {
     console.warn("[osd] detection failed:", (err as Error).message);
-    return { ok: false, rawAngle: 0, angle: 0, confidence: 0 };
+    return {
+      ok: false,
+      rawAngle: 0,
+      angle: 0,
+      confidence: 0,
+      script: null,
+      scriptConfidence: 0,
+    };
   }
 }
 

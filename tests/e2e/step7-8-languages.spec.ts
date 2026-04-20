@@ -150,6 +150,21 @@ test.describe("languages — selector + download UI", () => {
     await expect(page.getByTestId("lang-check-chi_sim")).toBeDisabled();
   });
 
+  test("script-hint pill surfaces OSD's detected script after preprocess", async ({
+    page,
+  }) => {
+    await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
+    await expect(page.getByTestId("page-card-0")).toHaveAttribute(
+      "data-preprocess-status",
+      "done",
+      { timeout: 180_000 },
+    );
+    const hint = page.getByTestId("lang-script-hint");
+    await expect(hint).toBeVisible({ timeout: 10_000 });
+    await expect(hint).toHaveAttribute("data-script", /Latin/i);
+  });
+
   test("langPathFor routes eng-only to local, anything else to CDN", async ({ page }) => {
     const result = await page.evaluate(async () => {
       // Harness surface doesn't export langPathFor directly — exercise via

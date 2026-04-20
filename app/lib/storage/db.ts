@@ -46,6 +46,10 @@ export interface PageStageStatus {
   skewAngleDegrees?: number;
   /** preprocess: cardinal rotation applied by OSD (0/90/180/270). */
   osdAngleDegrees?: 0 | 90 | 180 | 270;
+  /** preprocess: OSD-detected script (Latin/Cyrillic/Han/...). */
+  osdScript?: string;
+  /** preprocess: OSD script detection confidence (0+, higher = stronger). */
+  osdScriptConfidence?: number;
 }
 
 export interface Page {

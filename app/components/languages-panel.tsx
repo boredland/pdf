@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import {
   downloadLanguage,
   isLanguageCached,
@@ -8,7 +9,7 @@ import {
   joinLanguages,
   type LanguageInfo,
 } from "~/lib/languages";
-import type { Project } from "~/lib/storage/db";
+import type { Page, Project } from "~/lib/storage/db";
 import { getDb } from "~/lib/storage/db";
 
 interface Props {
@@ -29,6 +30,12 @@ export function LanguagesPanel({ project, disabled }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, DownloadState>>({});
   const [error, setError] = useState<string | null>(null);
+
+  const pages = useLiveQuery<Page[]>(
+    () => getDb().pages.where({ projectId: project.id }).toArray(),
+    [project.id],
+  );
+  const scriptHint = deriveScriptHint(pages ?? []);
 
   const selected = parseLanguages(project.settings.ocr.language);
   const selectedSet = new Set(selected);
@@ -95,11 +102,23 @@ export function LanguagesPanel({ project, disabled }: Props) {
       data-testid="languages-panel"
       className="space-y-3 rounded-md border border-slate-800 bg-slate-900/60 p-4 text-sm"
     >
-      <header className="flex items-center justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold text-slate-100">OCR languages (Tesseract)</h3>
-        <span className="text-[10px] uppercase tracking-wide text-slate-500">
-          selected: {selected.length === 0 ? "—" : selected.join(" + ")}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {scriptHint && (
+            <span
+              data-testid="lang-script-hint"
+              data-script={scriptHint.script}
+              className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-200"
+              title={`Tesseract OSD detected ${scriptHint.script} on ${scriptHint.pageCount} of ${scriptHint.totalPages} pages`}
+            >
+              detected: {scriptHint.script}
+            </span>
+          )}
+          <span className="text-[10px] uppercase tracking-wide text-slate-500">
+            selected: {selected.length === 0 ? "—" : selected.join(" + ")}
+          </span>
+        </div>
       </header>
       {error && (
         <p className="text-xs text-red-300" data-testid="languages-error">
@@ -212,4 +231,34 @@ function DownloadButton(props: {
       <span className="relative block px-2 py-0.5 tabular-nums">{label}</span>
     </button>
   );
+}
+
+interface ScriptHint {
+  script: string;
+  pageCount: number;
+  totalPages: number;
+}
+
+/**
+ * Majority-vote OSD's script detection across preprocessed pages. Returns
+ * the winning script if at least one page has a confident reading AND the
+ * winning script covers more than half of the confident pages. The result
+ * is purely informational for now — we don't auto-switch the language.
+ */
+function deriveScriptHint(pages: Page[]): ScriptHint | null {
+  const scored: Record<string, number> = {};
+  let confidentPages = 0;
+  for (const p of pages) {
+    const s = p.status?.preprocess;
+    if (!s?.osdScript) continue;
+    if ((s.osdScriptConfidence ?? 0) < 1.5) continue;
+    confidentPages++;
+    scored[s.osdScript] = (scored[s.osdScript] ?? 0) + 1;
+  }
+  if (confidentPages === 0) return null;
+  const winner = Object.entries(scored).sort(([, a], [, b]) => b - a)[0];
+  if (!winner) return null;
+  const [script, pageCount] = winner;
+  if (pageCount <= confidentPages / 2) return null;
+  return { script, pageCount, totalPages: pages.length };
 }
