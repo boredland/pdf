@@ -40,6 +40,10 @@ import {
 } from "~/lib/api-keys";
 import { rewindToStage } from "~/lib/pipeline/rewind";
 import { EXAMPLE_PDFS, loadExamplePdf } from "~/lib/examples";
+import {
+  getExifOrientation,
+  getRotationTransform,
+} from "~/lib/images/exif-orientation";
 
 declare global {
   interface Window {
@@ -131,6 +135,10 @@ declare global {
          * specs to swap in the "mock" provider and bypass real OCR.
          */
         setDefaultOcrProvider: (id: string) => void;
+        exif: {
+          getOrientation: typeof getExifOrientation;
+          getRotationTransform: typeof getRotationTransform;
+        };
       };
     };
     __pdfRenderCallCount?: number;
@@ -217,6 +225,10 @@ export function installTestHarness(): void {
     testing: {
       setDefaultOcrProvider: (id: string) => {
         DEFAULT_SETTINGS.ocr.providerId = id;
+      },
+      exif: {
+        getOrientation: getExifOrientation,
+        getRotationTransform,
       },
     },
   };
