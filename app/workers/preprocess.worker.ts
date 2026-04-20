@@ -226,7 +226,128 @@ function grayToRgba(gray: Uint8Array, w: number, h: number): Uint8ClampedArray {
   return out;
 }
 
+export interface TextRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DetectInput {
+  pngBytes: ArrayBuffer;
+  pageIndex: number;
+}
+
+export interface DetectOutput {
+  pageIndex: number;
+  regions: TextRegion[];
+  overlayDataUrl: string;
+  width: number;
+  height: number;
+}
+
+function detectTextRegionsImpl(
+  cv: CvAny,
+  binary: CvAny,
+): { regions: TextRegion[]; drawOn: (rgba: CvAny) => void } {
+  // Binary input: text is dark (0), background is light (255).
+  // Invert so text pixels become "foreground" for morphology.
+  const inverted = new cv.Mat();
+  cv.bitwise_not(binary, inverted);
+  const lineKernelWidth = Math.max(15, Math.round(binary.cols * 0.015));
+  const blockKernelHeight = Math.max(4, Math.round(binary.rows * 0.003));
+  const lineKernel = cv.getStructuringElement(
+    cv.MORPH_RECT,
+    new cv.Size(lineKernelWidth, 1),
+  );
+  const blockKernel = cv.getStructuringElement(
+    cv.MORPH_RECT,
+    new cv.Size(Math.max(6, lineKernelWidth / 2), blockKernelHeight),
+  );
+  const dilated = new cv.Mat();
+  cv.dilate(inverted, dilated, lineKernel, new cv.Point(-1, -1), 1);
+  const blocks = new cv.Mat();
+  cv.dilate(dilated, blocks, blockKernel, new cv.Point(-1, -1), 1);
+
+  const contours = new cv.MatVector();
+  const hierarchy = new cv.Mat();
+  cv.findContours(blocks, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+  const regions: TextRegion[] = [];
+  const minArea = Math.max(300, binary.cols * 0.002 * binary.rows * 0.002);
+  for (let i = 0; i < contours.size(); i++) {
+    const contour = contours.get(i);
+    const rect = cv.boundingRect(contour);
+    const { x, y, width, height } = rect as TextRegion;
+    if (width * height < minArea) {
+      contour.delete();
+      continue;
+    }
+    if (width < 20 || height < 12) {
+      contour.delete();
+      continue;
+    }
+    regions.push({ x, y, width, height });
+    contour.delete();
+  }
+
+  inverted.delete();
+  lineKernel.delete();
+  blockKernel.delete();
+  dilated.delete();
+  blocks.delete();
+  contours.delete();
+  hierarchy.delete();
+
+  const drawOn = (rgba: CvAny) => {
+    for (const r of regions) {
+      cv.rectangle(
+        rgba,
+        new cv.Point(r.x, r.y),
+        new cv.Point(r.x + r.width, r.y + r.height),
+        new cv.Scalar(255, 64, 64, 255),
+        Math.max(2, Math.round(binary.cols * 0.0025)),
+      );
+    }
+  };
+
+  return { regions, drawOn };
+}
+
 const api = {
+  async detect(input: DetectInput): Promise<DetectOutput> {
+    const { cv } = (await loadOpenCv()) as { cv: CvAny };
+    const imageData = await decodePng(input.pngBytes);
+    const src = cv.matFromImageData(imageData);
+    let gray: CvAny | null = null;
+    let binary: CvAny | null = null;
+    try {
+      gray = new cv.Mat();
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      binary = new cv.Mat();
+      cv.threshold(gray, binary, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+      const { regions, drawOn } = detectTextRegionsImpl(cv, binary);
+
+      drawOn(src);
+      const width = src.cols;
+      const height = src.rows;
+      const rgba = new Uint8ClampedArray(src.data);
+      const overlayDataUrl = await encodeThumbnail(rgba, width, height);
+
+      return {
+        pageIndex: input.pageIndex,
+        regions,
+        overlayDataUrl,
+        width,
+        height,
+      };
+    } finally {
+      gray?.delete();
+      binary?.delete();
+      src.delete();
+    }
+  },
+
   async measureSkew(pngBytes: ArrayBuffer): Promise<number> {
     const { cv } = (await loadOpenCv()) as { cv: CvAny };
     const imageData = await decodePng(pngBytes);

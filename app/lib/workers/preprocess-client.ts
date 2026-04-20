@@ -1,5 +1,9 @@
 import * as Comlink from "comlink";
-import type { PreprocessInput, PreprocessWorkerApi } from "~/workers/preprocess.worker";
+import type {
+  DetectInput,
+  PreprocessInput,
+  PreprocessWorkerApi,
+} from "~/workers/preprocess.worker";
 
 interface Slot {
   worker: Worker;
@@ -50,6 +54,20 @@ export async function preprocessPage(input: PreprocessInput) {
       w.__pdfPreprocessCallCount = (w.__pdfPreprocessCallCount ?? 0) + 1;
     }
     return await slot.api.preprocess(input);
+  } finally {
+    slot.busy = false;
+  }
+}
+
+export async function detectPage(input: DetectInput) {
+  const slot = await waitForSlot();
+  slot.busy = true;
+  try {
+    if (typeof window !== "undefined") {
+      const w = window as typeof window & { __pdfDetectCallCount?: number };
+      w.__pdfDetectCallCount = (w.__pdfDetectCallCount ?? 0) + 1;
+    }
+    return await slot.api.detect(input);
   } finally {
     slot.busy = false;
   }

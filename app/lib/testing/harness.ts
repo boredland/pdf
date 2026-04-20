@@ -12,6 +12,7 @@ import {
 } from "~/lib/pipeline/render-pipeline";
 import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { measureSkew } from "~/lib/workers/preprocess-client";
+import { runDetectPipeline, readDetectRegions } from "~/lib/pipeline/detect-pipeline";
 import { rewindToStage } from "~/lib/pipeline/rewind";
 import { EXAMPLE_PDF_URL, loadExamplePdf } from "~/lib/examples";
 
@@ -46,6 +47,10 @@ declare global {
         runPreprocessPipeline: typeof runPreprocessPipeline;
         measureSkew: typeof measureSkew;
       };
+      detect: {
+        runDetectPipeline: typeof runDetectPipeline;
+        readDetectRegions: typeof readDetectRegions;
+      };
       rewind: { toStage: typeof rewindToStage };
       example: {
         url: string;
@@ -54,6 +59,7 @@ declare global {
     };
     __pdfRenderCallCount?: number;
     __pdfPreprocessCallCount?: number;
+    __pdfDetectCallCount?: number;
   }
 }
 
@@ -70,6 +76,7 @@ export function installTestHarness(): void {
     projects: { createProjectFromBytes, listProjects, getProject },
     render: { ensurePageRows, runRenderPipeline, dropRenderArtifacts },
     preprocess: { runPreprocessPipeline, measureSkew },
+    detect: { runDetectPipeline, readDetectRegions },
     rewind: { toStage: rewindToStage },
     example: { url: EXAMPLE_PDF_URL, load: loadExamplePdf },
   };
