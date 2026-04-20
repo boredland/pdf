@@ -17,8 +17,8 @@ const OSD_TIMEOUT_MS = 20_000;
 const MIN_CONFIDENCE = 2;
 
 export type OsdAngle = 0 | 90 | 180 | 270;
-/** Angles we're willing to act on without breaking downstream coord frames. */
-export type AppliedRotation = 0 | 180;
+/** Angles we act on. All cardinal rotations supported. */
+export type AppliedRotation = OsdAngle;
 
 export interface OsdResult {
   /** Raw cardinal angle returned by OSD (0/90/180/270). */
@@ -108,10 +108,7 @@ export async function detectOrientation(
     if (confidence < MIN_CONFIDENCE) {
       return { ok: true, rawAngle, angle: 0, confidence };
     }
-    // For now we only act on 180° — 90/270 would need dimension swaps in
-    // detect/MRC, and most real-world wrongly-oriented scans are upside-down.
-    const angle: AppliedRotation = rawAngle === 180 ? 180 : 0;
-    return { ok: true, rawAngle, angle, confidence };
+    return { ok: true, rawAngle, angle: rawAngle, confidence };
   } catch (err) {
     console.warn("[osd] detection failed:", (err as Error).message);
     return { ok: false, rawAngle: 0, angle: 0, confidence: 0 };

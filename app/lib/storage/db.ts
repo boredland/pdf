@@ -42,8 +42,8 @@ export interface PageStageStatus {
   overlayPath?: string;
   /** preprocess: measured skew angle before deskew rotation (degrees) */
   skewAngleDegrees?: number;
-  /** preprocess: cardinal rotation applied by OSD (0 or 180 degrees). */
-  osdAngleDegrees?: 0 | 180;
+  /** preprocess: cardinal rotation applied by OSD (0/90/180/270). */
+  osdAngleDegrees?: 0 | 90 | 180 | 270;
 }
 
 export interface Page {

@@ -52,7 +52,7 @@ async function buildUpsideDownPdfBytes(page: Page): Promise<number[]> {
   });
 }
 
-test.describe("step 12 — OSD 180° rotation correction", () => {
+test.describe("step 12 — OSD cardinal rotation correction", () => {
   test.setTimeout(180_000);
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
@@ -137,5 +137,40 @@ test.describe("step 12 — OSD 180° rotation correction", () => {
     }, pdfArr);
 
     expect(result.osdAngle).toBe(0);
+  });
+
+  test("cardinal.pdf: OSD covers all four rotations across the 4-page fixture", async ({
+    page,
+  }) => {
+    await page.evaluate(() =>
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock"),
+    );
+    const result = await page.evaluate(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const app = (window as any).__pdfApp!;
+      const bytes = await app.example.loadById("cardinal");
+      const project = await app.projects.createProjectFromBytes(
+        "cardinal-osd",
+        bytes,
+      );
+      await app.render.ensurePageRows(project);
+      const fresh = (await app.projects.getProject(project.id))!;
+      // Render every page, then preprocess every page — OSD runs per page.
+      await app.pipeline.runStage(fresh, "render");
+      const afterRender = (await app.projects.getProject(project.id))!;
+      await app.pipeline.runStage(afterRender, "preprocess");
+      const rows = await app.db.pages
+        .where({ projectId: project.id })
+        .sortBy("index");
+      return rows.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (r: any) => r.status?.preprocess?.osdAngleDegrees ?? null,
+      );
+    });
+
+    // Fixture pages are stored rotated 0°/90°/180°/270°. OSD returns the
+    // *corrective* rotation needed to bring each page upright — which is
+    // (360 - storedAngle) mod 360: 0, 270, 180, 90.
+    expect(result).toEqual([0, 270, 180, 90]);
   });
 });

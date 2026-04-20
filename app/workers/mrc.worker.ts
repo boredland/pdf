@@ -12,8 +12,8 @@ export interface MrcInput {
   /** Rotate the render by this angle (degrees) before inpainting so mask
    * and background share the preprocessed (deskewed) coordinate system. */
   skewAngleDegrees?: number;
-  /** OSD cardinal pre-rotation applied by preprocess (0 or 180). */
-  osdAngleDegrees?: 0 | 180;
+  /** OSD cardinal pre-rotation applied by preprocess (0/90/180/270). */
+  osdAngleDegrees?: 0 | 90 | 180 | 270;
 }
 
 export interface MrcOutput {
@@ -70,13 +70,22 @@ function toCanvasRotated(
   return { canvas, ctx };
 }
 
-async function rotate180Bitmap(bitmap: ImageBitmap): Promise<ImageBitmap> {
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+async function rotateCardinalBitmap(
+  bitmap: ImageBitmap,
+  angle: 90 | 180 | 270,
+): Promise<ImageBitmap> {
+  const swap = angle === 90 || angle === 270;
+  const outW = swap ? bitmap.height : bitmap.width;
+  const outH = swap ? bitmap.width : bitmap.height;
+  const canvas = new OffscreenCanvas(outW, outH);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2d ctx unavailable");
-  ctx.translate(bitmap.width, bitmap.height);
-  ctx.rotate(Math.PI);
-  ctx.drawImage(bitmap, 0, 0);
+  // Rotate the canvas around its output centre, then draw the bitmap centred
+  // at the origin. Using centre-based rotation avoids having to pick between
+  // "rotate around (0,0) then translate" and "translate then rotate" variants.
+  ctx.translate(outW / 2, outH / 2);
+  ctx.rotate((angle * Math.PI) / 180);
+  ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
   return canvas.transferToImageBitmap();
 }
 
@@ -269,24 +278,25 @@ const api = {
     // Preprocess deskews the image before binarizing; the mask we extract
     // lives in the deskewed coordinate system. To make mask + background
     // compose cleanly, apply the same rotation to the render first.
-    // Stack: OSD cardinal flip (if any) → then fine skew.
+    // Stack: OSD cardinal rotation (if any) → then fine skew.
+    const osdAngle = input.osdAngleDegrees;
     const osdBitmap =
-      input.osdAngleDegrees === 180
-        ? await rotate180Bitmap(renderBitmap)
+      osdAngle === 90 || osdAngle === 180 || osdAngle === 270
+        ? await rotateCardinalBitmap(renderBitmap, osdAngle)
         : renderBitmap;
     const skew = input.skewAngleDegrees ?? 0;
     const { ctx: renderCtx } =
       Math.abs(skew) > 0.05
         ? toCanvasRotated(osdBitmap, skew)
         : toCanvas(osdBitmap);
-    const renderImg = renderCtx.getImageData(0, 0, renderBitmap.width, renderBitmap.height);
+    const renderImg = renderCtx.getImageData(0, 0, osdBitmap.width, osdBitmap.height);
     const { canvas: preCanvas } = toCanvas(preBitmap);
     const preImg = preCanvas
       .getContext("2d")!
       .getImageData(0, 0, preBitmap.width, preBitmap.height);
 
-    const width = renderBitmap.width;
-    const height = renderBitmap.height;
+    const width = osdBitmap.width;
+    const height = osdBitmap.height;
     if (preBitmap.width !== width || preBitmap.height !== height) {
       throw new Error("preprocessed and render page dimensions disagree");
     }

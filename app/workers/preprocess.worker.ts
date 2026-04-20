@@ -32,6 +32,8 @@ async function loadOpenCv(): Promise<{ cv: CV }> {
   return { cv };
 }
 
+export type OsdCardinal = 0 | 90 | 180 | 270;
+
 export interface PreprocessInput {
   pngBytes: ArrayBuffer;
   pageIndex: number;
@@ -39,10 +41,10 @@ export interface PreprocessInput {
   binarizer: "sauvola" | "otsu";
   denoiseRadius: number;
   /**
-   * Pre-rotation to apply before deskew. Used to correct upside-down
-   * scans flagged by OSD. Only 0 or 180 supported today.
+   * Pre-rotation to apply before deskew. Used to correct mis-oriented
+   * scans flagged by OSD. 0/90/180/270 supported.
    */
-  osdAngleDegrees?: 0 | 180;
+  osdAngleDegrees?: OsdCardinal;
 }
 
 export interface PreprocessOutput {
@@ -53,7 +55,7 @@ export interface PreprocessOutput {
   thumbnailDataUrl: string;
   skewAngleDegrees: number;
   /** What we actually applied (mirrors the input; persisted for downstream). */
-  osdAngleDegrees: 0 | 180;
+  osdAngleDegrees: OsdCardinal;
 }
 
 const THUMB_MAX_SIDE = 160;
@@ -168,6 +170,26 @@ function rotate(cv: CvAny, gray: CvAny, angleDeg: number): CvAny {
   return dst;
 }
 
+/**
+ * Rotate by a cardinal angle (0/90/180/270) using OpenCV's `rotate` op.
+ * Dimension-swapping for 90 and 270 is handled by cv.rotate itself — the
+ * destination Mat comes back with rows/cols swapped as appropriate.
+ * Returns the *input* mat for 0° (caller must not delete the returned Mat
+ * in that case, as it's the same reference).
+ */
+function rotateCardinal(cv: CvAny, src: CvAny, angle: 0 | 90 | 180 | 270): CvAny {
+  if (angle === 0) return src;
+  const code =
+    angle === 90
+      ? cv.ROTATE_90_CLOCKWISE
+      : angle === 180
+        ? cv.ROTATE_180
+        : cv.ROTATE_90_COUNTERCLOCKWISE; // 270
+  const dst = new cv.Mat();
+  cv.rotate(src, dst, code);
+  return dst;
+}
+
 function sauvolaBinarize(cv: CvAny, gray: CvAny, window: number, k: number): CvAny {
   const dst = new cv.Mat(gray.rows, gray.cols, cv.CV_8UC1);
   const floatSrc = new cv.Mat();
@@ -247,8 +269,8 @@ export interface DetectInput {
   renderPngBytes: ArrayBuffer;
   /** skew angle applied by preprocess — used to rotate the render */
   skewAngleDegrees: number;
-  /** OSD cardinal pre-rotation (0 or 180) applied by preprocess. */
-  osdAngleDegrees?: 0 | 180;
+  /** OSD cardinal pre-rotation (0/90/180/270) applied by preprocess. */
+  osdAngleDegrees?: OsdCardinal;
   pageIndex: number;
 }
 
@@ -351,12 +373,19 @@ const api = {
       cv.threshold(preGray, binary, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
       const { regions, drawOn } = detectTextRegionsImpl(cv, binary);
 
-      // First bring the render into the preprocessed coordinate frame: OSD
-      // flip (180° only), then fine skew.
+      // Bring the render into the preprocessed coordinate frame: OSD
+      // cardinal rotation first, then fine skew.
       let base: CvAny = renderSrc;
-      if (input.osdAngleDegrees === 180) {
-        flippedRender = new cv.Mat();
-        cv.rotate(renderSrc, flippedRender, cv.ROTATE_180);
+      const osdAngle: OsdCardinal =
+        input.osdAngleDegrees === 90
+          ? 90
+          : input.osdAngleDegrees === 180
+            ? 180
+            : input.osdAngleDegrees === 270
+              ? 270
+              : 0;
+      if (osdAngle !== 0) {
+        flippedRender = rotateCardinal(cv, renderSrc, osdAngle);
         base = flippedRender;
       }
       const skew = input.skewAngleDegrees ?? 0;
@@ -414,17 +443,22 @@ const api = {
     const src = cv.matFromImageData(imageData);
     let work: CvAny | null = null;
     let skewAngleDegrees = 0;
-    const osdAngleDegrees = input.osdAngleDegrees === 180 ? 180 : 0;
+    const osdAngleDegrees: OsdCardinal =
+      input.osdAngleDegrees === 90
+        ? 90
+        : input.osdAngleDegrees === 180
+          ? 180
+          : input.osdAngleDegrees === 270
+            ? 270
+            : 0;
     try {
       work = new cv.Mat();
       cv.cvtColor(src, work, cv.COLOR_RGBA2GRAY);
 
-      if (osdAngleDegrees === 180) {
-        // 180° is a dimension-preserving flip — same output width/height.
-        const flipped = new cv.Mat();
-        cv.rotate(work, flipped, cv.ROTATE_180);
+      if (osdAngleDegrees !== 0) {
+        const rotated = rotateCardinal(cv, work, osdAngleDegrees);
         work.delete();
-        work = flipped;
+        work = rotated;
       }
 
       if (input.denoiseRadius > 0) {

@@ -83,10 +83,10 @@ export async function runPreprocessPipeline(
       if (!renderBlob) throw new Error("render artifact missing on disk");
       const pngBytes = await renderBlob.arrayBuffer();
 
-      // Ask OSD whether this page is upside-down. If the setting is off or
+      // Ask OSD whether this page is rotated. If the setting is off or
       // OSD fails/times out, the helper returns angle=0 and we proceed as
       // if nothing needed flipping.
-      let osdAngleDegrees: 0 | 180 = 0;
+      let osdAngleDegrees: 0 | 90 | 180 | 270 = 0;
       if (project.settings.preprocess.orientationDetect) {
         const osd = await detectOrientation(pngBytes);
         osdAngleDegrees = osd.angle;
