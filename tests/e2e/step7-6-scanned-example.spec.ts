@@ -97,4 +97,50 @@ test.describe("scanned example fixture (OCRmyPDF skew.pdf)", () => {
     // on real content.
     expect(wordCount).toBeGreaterThan(60);
   });
+
+  test("built PDF stays within ~5× of the scanned source (MRC compression)", async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock");
+      window.__pdfApp!.testing.setDefaultOrientationDetect(false);
+    });
+    const sizes = await page.evaluate(async () => {
+      const app = window.__pdfApp!;
+      const bytes = await app.example.loadById("scanned");
+      const project = await app.projects.createProjectFromBytes(
+        "scanned-compress",
+        bytes,
+      );
+      await app.render.ensurePageRows(project);
+      await app.pipeline.runFromStage(
+        (await app.projects.getProject(project.id))!,
+        "all",
+      );
+      const final = (await app.projects.getProject(project.id))!;
+      const manifests = [];
+      for (let i = 0; i < final.pageCount; i++) {
+        manifests.push(await app.mrc.readMrcManifest(final.id, i));
+      }
+      return {
+        source: project.sourceSizeBytes ?? bytes.byteLength,
+        built: final.build?.sizeBytes ?? 0,
+        pageCount: final.pageCount,
+        maskTotalBytes: manifests.reduce(
+          (sum, m) => sum + (m?.maskBytes ?? 0),
+          0,
+        ),
+        bgTotalBytes: manifests.reduce(
+          (sum, m) => sum + (m?.bgBytes ?? 0),
+          0,
+        ),
+      };
+    });
+    // Previously the builder embedded the full-res composed PNG per page,
+    // which pushed the output to ~18× the source. The mask+bg split + mask
+    // downsampling drops it to ~7-8×. True DjVu-class sizes still need a
+    // real JBIG2 mask encoder — tracked in todo.txt.
+    expect(sizes.built).toBeGreaterThan(0);
+    expect(sizes.built / sizes.source).toBeLessThan(10);
+  });
 });

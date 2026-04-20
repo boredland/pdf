@@ -179,11 +179,30 @@ function inpaintBackground(
 function presetConfig(preset: MrcPreset) {
   switch (preset) {
     case "lossless":
-      return { bgMime: "image/png" as const, bgQuality: undefined, bgScale: 1 };
+      return {
+        bgMime: "image/png" as const,
+        bgQuality: undefined,
+        bgScale: 1,
+        maskScale: 1,
+      };
     case "archival":
-      return { bgMime: "image/jpeg" as const, bgQuality: 0.85, bgScale: 0.75 };
+      return {
+        bgMime: "image/jpeg" as const,
+        bgQuality: 0.85,
+        bgScale: 0.75,
+        // Downsample mask to match bg resolution. At 300 DPI → 225 DPI this
+        // still gives crisp text edges but roughly halves mask byte cost.
+        maskScale: 0.75,
+      };
     case "compact":
-      return { bgMime: "image/jpeg" as const, bgQuality: 0.5, bgScale: 0.5 };
+      return {
+        bgMime: "image/jpeg" as const,
+        bgQuality: 0.5,
+        bgScale: 0.5,
+        // 150 DPI mask — fine-print may soften but still readable, and we
+        // trade ~4× mask size for it.
+        maskScale: 0.5,
+      };
   }
 }
 
@@ -311,11 +330,17 @@ const api = {
     const bgBytes = new Uint8Array(await bgBlob.arrayBuffer());
 
     const maskRgba = maskToRgba(mask, width, height);
-    const maskCanvas = new OffscreenCanvas(width, height);
-    maskCanvas.getContext("2d")!.putImageData(makeImageData(maskRgba, width, height), 0, 0);
+    // Downsample the mask to the preset's maskScale before encoding. At 300
+    // DPI full-res the mask alone dominates the PDF; 0.5-0.75 scale cuts
+    // its byte cost by 2-4× while staying sharp enough for on-screen reading.
+    const { canvas: maskCanvas } = await downsample(
+      maskRgba,
+      width,
+      height,
+      config.maskScale,
+    );
     let maskPngBytes = await encode(maskCanvas, "image/png");
-    
-    // Optimize mask with pure black/white thresholding for better compression
+    // Re-binarize after the resample (bicubic leaves grayscale smudges).
     maskPngBytes = await optimizeMaskPng(maskPngBytes);
 
     const { canvas: composedCanvas, rgba: composedRgba } = await compose(

@@ -23,7 +23,8 @@ import {
   predictInvalidation,
   sumArtifactBytes,
 } from "~/lib/project-progress";
-import { listProviders } from "~/lib/providers/registry";
+import { getProvider, listProviders, registerProvider } from "~/lib/providers/registry";
+import { mockProvider } from "~/lib/providers/mock";
 import {
   downloadLanguage,
   isLanguageCached,
@@ -230,6 +231,16 @@ export function installTestHarness(): void {
     },
     testing: {
       setDefaultOcrProvider: (id: string) => {
+        // The mock provider isn't registered in the default registry (it
+        // would otherwise leak into prod's provider dropdown). Register it
+        // here lazily when a spec asks for it.
+        if (id === "mock") {
+          try {
+            getProvider("mock");
+          } catch {
+            registerProvider(mockProvider);
+          }
+        }
         DEFAULT_SETTINGS.ocr.providerId = id;
       },
       setDefaultOrientationDetect: (enabled: boolean) => {

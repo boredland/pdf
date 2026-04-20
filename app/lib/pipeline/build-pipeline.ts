@@ -107,8 +107,12 @@ export async function runBuildPipeline(
       }
       const manifest = await readMrcManifest(project.id, page.index);
       if (!manifest) throw new Error(`page ${page.index}: missing mrc manifest`);
-      const composedBlob = await readBlob(manifest.composedPath);
-      if (!composedBlob) throw new Error(`page ${page.index}: composed image missing`);
+      const [maskBlob, bgBlob] = await Promise.all([
+        readBlob(manifest.maskPath),
+        readBlob(manifest.bgPath),
+      ]);
+      if (!maskBlob) throw new Error(`page ${page.index}: mask image missing`);
+      if (!bgBlob) throw new Error(`page ${page.index}: background image missing`);
       const ocr = await readOcrResult(project.id, page.index);
       if (!ocr) throw new Error(`page ${page.index}: missing ocr result`);
 
@@ -118,7 +122,9 @@ export async function runBuildPipeline(
         project.settings.render.dpi,
       );
       pageInputs.push({
-        composedPngBytes: await composedBlob.arrayBuffer(),
+        maskPngBytes: await maskBlob.arrayBuffer(),
+        bgBytes: await bgBlob.arrayBuffer(),
+        bgMimeType: manifest.bgMimeType,
         ocr,
         pageWidthPt: widthPt,
         pageHeightPt: heightPt,

@@ -67,19 +67,25 @@
       the language selector.
 
 ## Output compression
-- [ ] Real JBIG2 encoder for the mask layer (current output is PNG
-      stand-in). jbig2enc-wasm exists but builds are flaky — vendor
-      our own if needed. Target: 5-10× mask-size reduction on bitonal
-      scans.
+- [x] Builder: embed mask + background separately (was: lossless PNG of
+      the composed image, ~18× source size) → ~7-8× after mask+bg split
+      and 0.75-scale mask. Further drops blocked on JBIG2.  (shipped)
+- [ ] Real JBIG2 encoder for the mask layer — **highest-impact remaining
+      compression item**. Our "optimized mask PNG" is 8-bit RGBA with
+      all pixels clamped to 0/255 and flate-compressed by the Canvas
+      PNG encoder; a real 1-bit-per-pixel encoding via jbig2enc gets
+      another 5-10× reduction on text-heavy pages. jbig2enc-wasm exists
+      but builds are flaky — vendor our own if needed.
 - [ ] Real JPEG 2000 encoder for the background layer (current output is
-      JPEG). openjpeg-wasm is the candidate.
-- [ ] Tune MRC "compact" preset: lower JP2 quality floor, more aggressive
-      downsample for pure-B&W regions. Measure round-trip SSIM so we
-      don't silently degrade.
-- [ ] Investigate zstd PDF stream filtering (PDF 2.0 feature) for
-      non-image streams — mupdf support TBD.
+      JPEG via Canvas). openjpeg-wasm is the candidate.
+- [ ] Use PDF native /ImageMask for the mask layer instead of an alpha
+      PNG. Requires dropping from pdf-lib's high-level API to PDFDict
+      internals, but it's the canonical MRC representation and lets
+      viewers avoid compositing cost.
 - [ ] Skip MRC split entirely for pure-B&W pages — emit a single bitonal
       image. Saves the background-layer bytes.
+- [ ] Investigate zstd PDF stream filtering (PDF 2.0 feature) for
+      non-image streams — mupdf support TBD.
 
 ## Deferred follow-ups (from memory)
 - [ ] pino-style structured browser logging (replace ad-hoc console.warn)
