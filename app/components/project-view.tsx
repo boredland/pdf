@@ -7,6 +7,7 @@ import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
 import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
+import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
 import { PIPELINE_ORDER, runStage } from "~/lib/pipeline/run-stage";
 import { rewindToStage } from "~/lib/pipeline/rewind";
 import { PageDetailPane } from "~/components/page-detail-pane";
@@ -116,6 +117,9 @@ export function ProjectView() {
         await runOcrPipeline(project, { signal: controller.signal });
         if (controller.signal.aborted) return;
         await runMrcPipeline(project, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        const fresh = await getDb().projects.get(project.id);
+        if (fresh) await runBuildPipeline(fresh, { signal: controller.signal });
       } else {
         await runStage(project, stageToRun, { signal: controller.signal });
       }
@@ -126,6 +130,21 @@ export function ProjectView() {
       abortRef.current = null;
     }
   }, [project, stageToRun]);
+
+  const onDownload = useCallback(async () => {
+    if (!project?.build) return;
+    const blob = await readBuildOutput(project.id);
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safeName = project.name.replace(/[^\w.-]+/g, "_");
+    a.download = `${safeName || "output"}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [project]);
 
   const pageList = pages ?? [];
 
@@ -183,6 +202,17 @@ export function ProjectView() {
                   >
                     Run
                   </button>
+                  {project.build && (
+                    <button
+                      type="button"
+                      onClick={() => void onDownload()}
+                      data-testid="download-pdf"
+                      className="rounded-md bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-200 hover:bg-emerald-500/30"
+                      title={`Searchable PDF · ${Math.round((project.build.sizeBytes ?? 0) / 1024)} KB`}
+                    >
+                      Download PDF
+                    </button>
+                  )}
                 </>
               )}
               {isBusy && (

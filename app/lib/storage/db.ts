@@ -2,6 +2,13 @@ import Dexie, { type EntityTable } from "dexie";
 
 export type Stage = "render" | "preprocess" | "detect" | "ocr" | "mrc" | "build";
 
+export interface ProjectBuildOutput {
+  hash: string;
+  completedAt: number;
+  artifactPath: string;
+  sizeBytes: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -9,6 +16,7 @@ export interface Project {
   sourcePdfPath: string;
   pageCount: number;
   settings: ProjectSettings;
+  build?: ProjectBuildOutput;
 }
 
 export interface ProjectSettings {

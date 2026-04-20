@@ -15,6 +15,8 @@ import { measureSkew } from "~/lib/workers/preprocess-client";
 import { runDetectPipeline, readDetectRegions } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline, readOcrResult } from "~/lib/pipeline/ocr-pipeline";
 import { runMrcPipeline, readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
+import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
+import { getPageCount as renderGetPageCount } from "~/lib/workers/render-client";
 import { runStage, runFromStage, PIPELINE_ORDER } from "~/lib/pipeline/run-stage";
 import { listProviders } from "~/lib/providers/registry";
 import {
@@ -60,6 +62,11 @@ declare global {
         ensurePageRows: typeof ensurePageRows;
         runRenderPipeline: typeof runRenderPipeline;
         dropRenderArtifacts: typeof dropRenderArtifacts;
+        getPageCount: typeof renderGetPageCount;
+      };
+      pdfInspect: {
+        /** Extract per-page text from a PDF blob via mupdf (test-only). */
+        extractText: (bytes: ArrayBuffer) => Promise<string[]>;
       };
       preprocess: {
         runPreprocessPipeline: typeof runPreprocessPipeline;
@@ -77,6 +84,10 @@ declare global {
       mrc: {
         runMrcPipeline: typeof runMrcPipeline;
         readMrcManifest: typeof readMrcManifest;
+      };
+      build: {
+        runBuildPipeline: typeof runBuildPipeline;
+        readBuildOutput: typeof readBuildOutput;
       };
       pipeline: {
         runStage: typeof runStage;
@@ -108,6 +119,7 @@ declare global {
     __pdfPreprocessCallCount?: number;
     __pdfDetectCallCount?: number;
     __pdfMrcCallCount?: number;
+    __pdfBuildCallCount?: number;
   }
 }
 
@@ -122,11 +134,41 @@ export function installTestHarness(): void {
     cache: { getCacheStatus, purgeCaches },
     artifacts: { settingsHash, artifactPath, DEFAULT_SETTINGS },
     projects: { createProjectFromBytes, listProjects, getProject },
-    render: { ensurePageRows, runRenderPipeline, dropRenderArtifacts },
+    render: {
+      ensurePageRows,
+      runRenderPipeline,
+      dropRenderArtifacts,
+      getPageCount: renderGetPageCount,
+    },
+    pdfInspect: {
+      extractText: async (bytes: ArrayBuffer) => {
+        const mupdf = await import("mupdf");
+        const doc = mupdf.Document.openDocument(
+          new Uint8Array(bytes),
+          "application/pdf",
+        );
+        try {
+          const out: string[] = [];
+          for (let i = 0; i < doc.countPages(); i++) {
+            const p = doc.loadPage(i) as import("mupdf").PDFPage;
+            try {
+              const stext = p.toStructuredText("preserve-whitespace");
+              out.push(stext.asText());
+            } finally {
+              p.destroy();
+            }
+          }
+          return out;
+        } finally {
+          doc.destroy();
+        }
+      },
+    },
     preprocess: { runPreprocessPipeline, measureSkew },
     detect: { runDetectPipeline, readDetectRegions },
     ocr: { runOcrPipeline, readOcrResult, listProviders },
     mrc: { runMrcPipeline, readMrcManifest },
+    build: { runBuildPipeline, readBuildOutput },
     pipeline: { runStage, runFromStage, order: PIPELINE_ORDER },
     languages: {
       list: LANGUAGES,
