@@ -6,6 +6,13 @@ export const EXAMPLE_PDFS = {
     description:
       "Real scanned document with skew and scan noise. Exercises the full preprocess pipeline.",
   },
+  cardinal: {
+    id: "cardinal",
+    url: `${import.meta.env.BASE_URL}examples/cardinal.pdf`,
+    name: "OCRmyPDF cardinal.pdf (mixed content)",
+    description:
+      "Multi-page scanned document with text and image content. Good for testing MRC compression.",
+  },
   synthetic: {
     id: "synthetic",
     url: `${import.meta.env.BASE_URL}examples/fallback.pdf`,

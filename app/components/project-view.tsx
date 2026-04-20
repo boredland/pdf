@@ -311,6 +311,16 @@ function DropZone(props: {
         </button>
         <button
           type="button"
+          data-testid="load-example-cardinal"
+          disabled={disabled}
+          onClick={() => onLoadExample("cardinal")}
+          className="rounded-md bg-sky-500/20 px-3 py-1.5 text-sm text-sky-200 hover:bg-sky-500/30 disabled:opacity-60"
+          title={EXAMPLE_PDFS.cardinal.description}
+        >
+          Load cardinal example
+        </button>
+        <button
+          type="button"
           data-testid="load-example-synthetic"
           disabled={disabled}
           onClick={() => onLoadExample("synthetic")}

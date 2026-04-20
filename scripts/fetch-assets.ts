@@ -29,6 +29,14 @@ const SCANNED_EXAMPLE = {
   minBytes: 50_000,
 };
 
+// Mixed content example: OCRmyPDF's cardinal.pdf with images (MPL-2.0).
+// Good for testing MRC with non-trivial page content.
+const CARDINAL_EXAMPLE = {
+  url: "https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/v16.11.0/tests/resources/cardinal.pdf",
+  out: `${EXAMPLES_DIR}/cardinal.pdf`,
+  minBytes: 50_000,
+};
+
 const CORE_FILES = [
   "tesseract-core.wasm",
   "tesseract-core.wasm.js",
@@ -92,6 +100,21 @@ async function downloadScannedExample() {
   console.log(`wrote ${SCANNED_EXAMPLE.out}`);
 }
 
+async function downloadCardinalExample() {
+  if (await fileHasSize(CARDINAL_EXAMPLE.out, CARDINAL_EXAMPLE.minBytes)) return;
+  await mkdir(EXAMPLES_DIR, { recursive: true });
+  console.log(`downloading ${CARDINAL_EXAMPLE.url}`);
+  const res = await fetch(CARDINAL_EXAMPLE.url);
+  if (!res.ok || !res.body) {
+    throw new Error(`fetch failed ${res.status} ${res.statusText}`);
+  }
+  await pipeline(
+    Readable.fromWeb(res.body as never),
+    createWriteStream(CARDINAL_EXAMPLE.out),
+  );
+  console.log(`wrote ${CARDINAL_EXAMPLE.out}`);
+}
+
 async function main() {
   await mkdir(OUT, { recursive: true });
 
@@ -124,6 +147,15 @@ async function main() {
     console.warn(
       `failed to download scanned example: ${(err as Error).message}.\n` +
         "Synthetic fallback will still be available.",
+    );
+  }
+
+  try {
+    await downloadCardinalExample();
+  } catch (err) {
+    console.warn(
+      `failed to download cardinal example: ${(err as Error).message}.\n` +
+        "Scanned example will still be available.",
     );
   }
 }
