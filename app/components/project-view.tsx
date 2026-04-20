@@ -47,7 +47,7 @@ export function ProjectView() {
 
   const runningStages = useProgressMap(activeProjectId);
 
-  const ingest = useCallback(async (name: string, bytes: ArrayBuffer) => {
+  const ingest = useCallback(async (name: string, bytes: ArrayBuffer, mimeType?: string) => {
     // Project creation only: we deliberately don't auto-run the pipeline.
     // The user should review settings (languages, OCR provider, MRC preset,
     // preprocess toggles) *before* anything kicks off — pipelines run only
@@ -55,7 +55,7 @@ export function ProjectView() {
     setError(null);
     setIsBusy(true);
     try {
-      const next = await createProjectFromBytes(name, bytes);
+      const next = await createProjectFromBytes(name, bytes, mimeType);
       setActiveProjectId(next.id);
       await ensurePageRows(next);
     } catch (err) {
@@ -68,7 +68,7 @@ export function ProjectView() {
   const onFileDrop = useCallback(
     async (file: File) => {
       const bytes = await file.arrayBuffer();
-      await ingest(file.name, bytes);
+      await ingest(file.name, bytes, file.type);
     },
     [ingest],
   );
