@@ -41,12 +41,14 @@ export async function createProjectFromBytes(
     }
   }
 
-  await writeFile(sourcePdfPath, new Uint8Array(pdfBytes));
+  const pdfBytesU8 = new Uint8Array(pdfBytes);
+  await writeFile(sourcePdfPath, pdfBytesU8);
   const project: Project = {
     id,
     name,
     createdAt: Date.now(),
     sourcePdfPath,
+    sourceSizeBytes: pdfBytesU8.byteLength,
     pageCount: 0,
     settings: structuredClone(DEFAULT_SETTINGS),
   };

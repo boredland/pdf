@@ -171,4 +171,20 @@ test.describe("step 8 — searchable PDF builder", () => {
     await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("download-pdf")).toBeVisible({ timeout: 180_000 });
   });
+
+  test("UI: project header shows original → built size delta after build", async ({
+    page,
+  }) => {
+    await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
+    await expect(page.getByTestId("download-pdf")).toBeVisible({ timeout: 180_000 });
+    const delta = page.getByTestId("project-size-delta");
+    await expect(delta).toBeVisible();
+    // "X KB → Y KB (±N%)" — loose pattern that survives locale differences.
+    await expect(delta).toContainText(/→/);
+    await expect(delta).toHaveAttribute(
+      "data-size-delta-percent",
+      /^-?\d+$/,
+    );
+  });
 });

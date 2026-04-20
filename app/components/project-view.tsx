@@ -175,6 +175,7 @@ export function ProjectView() {
               <p className="text-xs text-slate-500" data-testid="project-meta">
                 {project.pageCount} page{project.pageCount === 1 ? "" : "s"} · {project.id}
               </p>
+              <SizeDelta project={project} />
             </div>
             <div className="flex items-center gap-2">
               {!isBusy && (
@@ -249,6 +250,37 @@ export function ProjectView() {
       )}
     </div>
   );
+}
+
+function SizeDelta({ project }: { project: Project }) {
+  const source = project.sourceSizeBytes;
+  const built = project.build?.sizeBytes;
+  if (!source || !built) return null;
+  const deltaPct = ((built - source) / source) * 100;
+  const rounded = Math.round(deltaPct);
+  const sign = rounded >= 0 ? "+" : "";
+  const tone =
+    rounded <= -5
+      ? "text-emerald-400"
+      : rounded >= 5
+        ? "text-amber-400"
+        : "text-slate-400";
+  return (
+    <p
+      className={`text-xs ${tone}`}
+      data-testid="project-size-delta"
+      data-size-delta-percent={rounded}
+    >
+      {formatBytes(source)} → {formatBytes(built)} ({sign}
+      {rounded}%)
+    </p>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function getRunLabel(project: Project | undefined, pages: Page[]): string {

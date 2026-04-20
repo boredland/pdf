@@ -14,6 +14,8 @@ export interface Project {
   name: string;
   createdAt: number;
   sourcePdfPath: string;
+  /** Byte size of the ingested PDF (post image→PDF conversion if applicable). */
+  sourceSizeBytes?: number;
   pageCount: number;
   settings: ProjectSettings;
   build?: ProjectBuildOutput;

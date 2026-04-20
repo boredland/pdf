@@ -27,9 +27,17 @@
       export (step13 e2e spec)                              (shipped)
 - [ ] Asset-cache pane polish (sizes, purge per-asset, online/offline state)
 - [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
-- [ ] Display original vs. built PDF size (and the delta) on the project
-      header so users see the MRC compression payoff (or penalty) at a
-      glance. Plain bytes, plus a +/-% readout.
+- [x] Display original vs. built PDF size (and the delta) on the project
+      header so users see the MRC compression payoff (or penalty).
+- [ ] Let users drop pages from the project (e.g. blank cover pages,
+      back-matter they don't want OCR'd). Needs: per-page "remove"
+      control, invalidation of downstream artifacts for the removed
+      index, and a re-index pass so page numbers stay contiguous.
+- [ ] Bump thumbnail resolution — 160px max-side is too crunchy on HiDPI
+      displays. Try 320/480 and measure the OPFS+thumbnail cost hit.
+      Lives in THUMB_MAX_SIDE constants across render/preprocess/mrc
+      workers. Keep the page-card thumb small but let the detail-pane
+      strip serve a sharper variant.
 
 ## Rotation detection without EXIF
 - [x] Tesseract OSD in preprocess: all four cardinal rotations
@@ -40,15 +48,44 @@
 - [ ] Route osd.traineddata/eng.traineddata through the existing SW
       traineddata CacheFirst runtime cache via Workbox rule — currently
       only gets the precache globPatterns hit for bundled assets.
-- [ ] Provide a manual "rotate page" control in the detail pane as an
-      escape hatch when detection gets it wrong.
+- [ ] Provide a manual "rotate page" control in the detail pane (and
+      probably as a quick action on the page card too) as an escape
+      hatch when OSD gets it wrong. Needs: per-page rotation override
+      stored on the Page row, participates in preprocess hash so a
+      change invalidates downstream stages cleanly. Four-way toggle:
+      0° / 90° CW / 180° / 90° CCW.
+
+## Automatic language detection
+- [ ] Detect the page language(s) before OCR runs so users don't have to
+      pick. Two approaches worth prototyping:
+        a) Run Tesseract OSD first (already loaded for rotation) — it
+           returns `script` + `script_confidence`. Map Latin/Cyrillic/
+           Arabic/CJK/etc. to a default language code, let users confirm.
+        b) Kreuzberg-style: run a tiny LSTM on a sampled strip of each
+           page, vote across pages, pick the traineddata. Offline-safe
+           once the model ships (~1 MB).
+- [ ] Once detection is in, auto-download the selected traineddata via
+      the existing SW cache path and add a "Detected: <lang>" pill in
+      the language selector.
+
+## Output compression
+- [ ] Real JBIG2 encoder for the mask layer (current output is PNG
+      stand-in). jbig2enc-wasm exists but builds are flaky — vendor
+      our own if needed. Target: 5-10× mask-size reduction on bitonal
+      scans.
+- [ ] Real JPEG 2000 encoder for the background layer (current output is
+      JPEG). openjpeg-wasm is the candidate.
+- [ ] Tune MRC "compact" preset: lower JP2 quality floor, more aggressive
+      downsample for pure-B&W regions. Measure round-trip SSIM so we
+      don't silently degrade.
+- [ ] Investigate zstd PDF stream filtering (PDF 2.0 feature) for
+      non-image streams — mupdf support TBD.
+- [ ] Skip MRC split entirely for pure-B&W pages — emit a single bitonal
+      image. Saves the background-layer bytes.
 
 ## Deferred follow-ups (from memory)
 - [ ] pino-style structured browser logging (replace ad-hoc console.warn)
 - [ ] Multi-provider readiness (Mistral OCR, Doubleword, Gemma) behind registry
-- [ ] Language detection (Kreuzberg-inspired) — auto-pick traineddata by
-      sampling a few pages before full OCR
-- [ ] Real JBIG2 / JP2 encoders (current MRC output uses PNG/JPEG stand-ins)
 
 ## Known-broken / untested corners surfaced during the speedup pass
 - [ ] Tests that still run real Tesseract (step5, step6, step7-6, step8
