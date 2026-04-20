@@ -1,0 +1,16 @@
+node_modules
+dist
+app/routeTree.gen.ts
+.output
+.vinxi
+.nitro
+.tanstack
+coverage
+playwright-report
+test-results
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+bun.lockb.diff

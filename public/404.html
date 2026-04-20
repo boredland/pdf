@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>pdf — redirecting…</title>
+    <script>
+      // GitHub Pages SPA fallback: rewrite the 404 URL into a hash-param
+      // that index.html reads and restores via history.replaceState.
+      (function () {
+        var segments = window.location.pathname.split("/");
+        // For a project site at /<repo>/, keep the first segment as the base.
+        var basePath = segments.length > 1 ? "/" + segments[1] + "/" : "/";
+        var rest = window.location.pathname.substring(basePath.length);
+        var query = window.location.search ? "&q=" + encodeURIComponent(window.location.search.slice(1)) : "";
+        window.location.replace(basePath + "?spa=" + encodeURIComponent(rest) + query + window.location.hash);
+      })();
+    </script>
+  </head>
+  <body>Redirecting…</body>
+</html>
