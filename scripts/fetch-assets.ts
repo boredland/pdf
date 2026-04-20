@@ -16,9 +16,14 @@ import { Readable } from "node:stream";
 const OUT = "public/tesseract";
 const CORE_PKG = "node_modules/tesseract.js-core";
 const JS_DIST = "node_modules/tesseract.js/dist";
+// Tessdata 4.1.0 from the upstream tessdata_fast repo (served raw via
+// jsdelivr). Tesseract 5 uses this same format version.
 const TRAINEDDATA_URL =
-  "https://cdn.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0_fast/eng.traineddata.gz";
+  "https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_fast@4.1.0/eng.traineddata";
 const TRAINEDDATA_OUT = `${OUT}/eng.traineddata`;
+const OSD_URL =
+  "https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_fast@4.1.0/osd.traineddata";
+const OSD_OUT = `${OUT}/osd.traineddata`;
 
 // Real scanned fixture: OCRmyPDF's deliberately-skewed test PDF (MPL-2.0).
 // Pinned by commit so the file never drifts under us.
@@ -70,19 +75,29 @@ async function copyIfMissing(src: string, dst: string) {
   console.log(`copied ${src} -> ${dst}`);
 }
 
-async function downloadTraineddata() {
-  if (await fileHasSize(TRAINEDDATA_OUT, 5 * 1024 * 1024)) return;
-  console.log(`downloading ${TRAINEDDATA_URL}`);
-  const res = await fetch(TRAINEDDATA_URL);
+async function downloadFile(url: string, out: string, minBytes: number) {
+  if (await fileHasSize(out, minBytes)) return;
+  console.log(`downloading ${url}`);
+  const res = await fetch(url);
   if (!res.ok || !res.body) {
     throw new Error(`fetch failed ${res.status} ${res.statusText}`);
   }
-  await pipeline(
-    Readable.fromWeb(res.body as never),
-    createGunzip(),
-    createWriteStream(TRAINEDDATA_OUT),
-  );
-  console.log(`wrote ${TRAINEDDATA_OUT}`);
+  const needGunzip = url.endsWith(".gz");
+  const stages = needGunzip
+    ? [Readable.fromWeb(res.body as never), createGunzip(), createWriteStream(out)]
+    : [Readable.fromWeb(res.body as never), createWriteStream(out)];
+  // pipeline is variadic; assert it accepts the stage list.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (pipeline as any)(...stages);
+  console.log(`wrote ${out}`);
+}
+
+async function downloadTraineddata() {
+  await downloadFile(TRAINEDDATA_URL, TRAINEDDATA_OUT, 2 * 1024 * 1024);
+}
+
+async function downloadOsdTraineddata() {
+  await downloadFile(OSD_URL, OSD_OUT, 5 * 1024);
 }
 
 async function downloadScannedExample() {
@@ -138,6 +153,15 @@ async function main() {
     console.warn(
       `failed to download eng.traineddata: ${(err as Error).message}.\n` +
         "OCR will still work — tesseract.js will fall back to jsdelivr on first use.",
+    );
+  }
+
+  try {
+    await downloadOsdTraineddata();
+  } catch (err) {
+    console.warn(
+      `failed to download osd.traineddata: ${(err as Error).message}.\n` +
+        "Orientation detection will be skipped at runtime.",
     );
   }
 

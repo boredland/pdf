@@ -28,18 +28,18 @@
 - [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
 
 ## Rotation detection without EXIF
-- [ ] Explore Tesseract OSD (Orientation and Script Detection) as a standalone
-      worker step. Requires:
-        - ship osd.traineddata alongside eng.traineddata (public/tesseract/)
-        - route its fetch through the SW traineddata cache so it works offline
-        - add a timeout + fallback so a slow/missing OSD doesn't stall ingest
-        - wire it into the preprocess stage, not the image→PDF ingest path
-        - e2e spec: upside-down scan → OSD detects → preprocess rotates →
-          OCR text reads right-side up
-- [ ] HoughLines skew detection in preprocess (already partly there; verify
-      it survives the ingest-path cleanup)
-- [ ] Provide a manual "rotate page" control in the detail pane as an escape
-      hatch when detection gets it wrong
+- [x] Tesseract OSD in preprocess (180° flip only, with timeout + skip
+      fallback) + settings toggle + e2e spec                (shipped)
+- [ ] Support 90°/270° cardinal rotations too. Needs dimension swapping
+      in detect/MRC workers (their current "rotate render by skew"
+      assumes the output frame matches the input).
+- [ ] Raise OSD confidence threshold (currently 2.0) after measuring on a
+      real scan corpus — lower FP rate on ambiguous pages.
+- [ ] Route osd.traineddata/eng.traineddata through the existing SW
+      traineddata CacheFirst runtime cache via Workbox rule — currently
+      only gets the precache globPatterns hit for bundled assets.
+- [ ] Provide a manual "rotate page" control in the detail pane as an
+      escape hatch when detection gets it wrong.
 
 ## Deferred follow-ups (from memory)
 - [ ] pino-style structured browser logging (replace ad-hoc console.warn)

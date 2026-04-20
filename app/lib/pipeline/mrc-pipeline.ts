@@ -108,6 +108,7 @@ export async function runMrcPipeline(
         pageIndex,
         preset: project.settings.mrc.preset,
         skewAngleDegrees: page.status.preprocess.skewAngleDegrees ?? 0,
+        osdAngleDegrees: page.status.preprocess.osdAngleDegrees ?? 0,
       });
 
       if (isAborted(options.signal)) {

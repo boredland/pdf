@@ -23,9 +23,10 @@ test.describe("step 7 — MRC split + compression", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await waitForHarness(page);
-    await page.evaluate(() =>
-      window.__pdfApp!.testing.setDefaultOcrProvider("mock"),
-    );
+    await page.evaluate(() => {
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock");
+      window.__pdfApp!.testing.setDefaultOrientationDetect(false);
+    });
   });
 
   test("presets order compact < archival <= lossless, compact stays small, round-trip fidelity holds", async ({

@@ -27,10 +27,12 @@ test.describe("step 8 — searchable PDF builder", () => {
     await waitForHarness(page);
     // Default to the mock OCR provider: every test here except the one
     // asserting round-tripped real text opts in individually if it needs
-    // Tesseract.
-    await page.evaluate(() =>
-      window.__pdfApp!.testing.setDefaultOcrProvider("mock"),
-    );
+    // Tesseract. Turn off OSD too — these specs exercise pipeline plumbing,
+    // not orientation detection.
+    await page.evaluate(() => {
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock");
+      window.__pdfApp!.testing.setDefaultOrientationDetect(false);
+    });
   });
 
   test("build produces a valid PDF with an invisible text layer that mupdf can read", async ({

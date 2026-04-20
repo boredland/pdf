@@ -95,6 +95,18 @@ export function SettingsPanel({
         <span>Deskew</span>
       </label>
       <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          data-testid="settings-orientation"
+          checked={project.settings.preprocess.orientationDetect}
+          disabled={disabled}
+          onChange={(e) => void update("orientationDetect", e.target.checked)}
+        />
+        <span title="Detect 180°-flipped scans via Tesseract OSD">
+          Auto-rotate (OSD)
+        </span>
+      </label>
+      <label className="flex items-center gap-2">
         <span className="shrink-0">Binarizer</span>
         <select
           data-testid="settings-binarizer"

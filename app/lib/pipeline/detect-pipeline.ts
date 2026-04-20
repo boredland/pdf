@@ -93,6 +93,7 @@ export async function runDetectPipeline(
         renderPngBytes: renderBytes,
         preprocessedPngBytes: preBytes,
         skewAngleDegrees: page.status.preprocess.skewAngleDegrees ?? 0,
+        osdAngleDegrees: page.status.preprocess.osdAngleDegrees ?? 0,
         pageIndex,
       });
 

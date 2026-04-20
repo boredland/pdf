@@ -25,9 +25,10 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await waitForHarness(page);
-    await page.evaluate(() =>
-      window.__pdfApp!.testing.setDefaultOcrProvider("mock"),
-    );
+    await page.evaluate(() => {
+      window.__pdfApp!.testing.setDefaultOcrProvider("mock");
+      window.__pdfApp!.testing.setDefaultOrientationDetect(false);
+    });
   });
 
   test("clicking a page card opens the detail pane with tabs for each stage", async ({

@@ -135,6 +135,12 @@ declare global {
          * specs to swap in the "mock" provider and bypass real OCR.
          */
         setDefaultOcrProvider: (id: string) => void;
+        /**
+         * Toggle OSD orientation detection in DEFAULT_SETTINGS. Specs that
+         * don't care about rotation flip this off to skip the ~10 MB OSD
+         * worker boot on each test context.
+         */
+        setDefaultOrientationDetect: (enabled: boolean) => void;
         exif: {
           getOrientation: typeof getExifOrientation;
           getRotationTransform: typeof getRotationTransform;
@@ -225,6 +231,9 @@ export function installTestHarness(): void {
     testing: {
       setDefaultOcrProvider: (id: string) => {
         DEFAULT_SETTINGS.ocr.providerId = id;
+      },
+      setDefaultOrientationDetect: (enabled: boolean) => {
+        DEFAULT_SETTINGS.preprocess.orientationDetect = enabled;
       },
       exif: {
         getOrientation: getExifOrientation,

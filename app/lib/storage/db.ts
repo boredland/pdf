@@ -21,7 +21,13 @@ export interface Project {
 
 export interface ProjectSettings {
   render: { dpi: number };
-  preprocess: { deskew: boolean; binarizer: "sauvola" | "otsu"; denoiseRadius: number };
+  preprocess: {
+    deskew: boolean;
+    /** Run Tesseract OSD to detect upside-down scans and flip to upright. */
+    orientationDetect: boolean;
+    binarizer: "sauvola" | "otsu";
+    denoiseRadius: number;
+  };
   detect: { enabled: boolean };
   ocr: { providerId: string; language: string };
   mrc: { preset: "lossless" | "archival" | "compact" };
@@ -36,6 +42,8 @@ export interface PageStageStatus {
   overlayPath?: string;
   /** preprocess: measured skew angle before deskew rotation (degrees) */
   skewAngleDegrees?: number;
+  /** preprocess: cardinal rotation applied by OSD (0 or 180 degrees). */
+  osdAngleDegrees?: 0 | 180;
 }
 
 export interface Page {
@@ -98,7 +106,12 @@ export function getDb(): AppDB {
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
   render: { dpi: 300 },
-  preprocess: { deskew: true, binarizer: "sauvola", denoiseRadius: 1 },
+  preprocess: {
+    deskew: true,
+    orientationDetect: true,
+    binarizer: "sauvola",
+    denoiseRadius: 1,
+  },
   detect: { enabled: true },
   ocr: { providerId: "tesseract", language: "eng" },
   mrc: { preset: "archival" },

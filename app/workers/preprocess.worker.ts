@@ -38,6 +38,11 @@ export interface PreprocessInput {
   deskew: boolean;
   binarizer: "sauvola" | "otsu";
   denoiseRadius: number;
+  /**
+   * Pre-rotation to apply before deskew. Used to correct upside-down
+   * scans flagged by OSD. Only 0 or 180 supported today.
+   */
+  osdAngleDegrees?: 0 | 180;
 }
 
 export interface PreprocessOutput {
@@ -47,6 +52,8 @@ export interface PreprocessOutput {
   height: number;
   thumbnailDataUrl: string;
   skewAngleDegrees: number;
+  /** What we actually applied (mirrors the input; persisted for downstream). */
+  osdAngleDegrees: 0 | 180;
 }
 
 const THUMB_MAX_SIDE = 160;
@@ -240,6 +247,8 @@ export interface DetectInput {
   renderPngBytes: ArrayBuffer;
   /** skew angle applied by preprocess — used to rotate the render */
   skewAngleDegrees: number;
+  /** OSD cardinal pre-rotation (0 or 180) applied by preprocess. */
+  osdAngleDegrees?: 0 | 180;
   pageIndex: number;
 }
 
@@ -333,6 +342,7 @@ const api = {
     // so the axis-aligned bboxes actually align with the text.
     const renderImageData = await decodePng(input.renderPngBytes);
     const renderSrc = cv.matFromImageData(renderImageData);
+    let flippedRender: CvAny | null = null;
     let rotatedRender: CvAny | null = null;
     try {
       preGray = new cv.Mat();
@@ -341,11 +351,19 @@ const api = {
       cv.threshold(preGray, binary, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
       const { regions, drawOn } = detectTextRegionsImpl(cv, binary);
 
+      // First bring the render into the preprocessed coordinate frame: OSD
+      // flip (180° only), then fine skew.
+      let base: CvAny = renderSrc;
+      if (input.osdAngleDegrees === 180) {
+        flippedRender = new cv.Mat();
+        cv.rotate(renderSrc, flippedRender, cv.ROTATE_180);
+        base = flippedRender;
+      }
       const skew = input.skewAngleDegrees ?? 0;
       if (Math.abs(skew) > 0.05) {
-        rotatedRender = rotate(cv, renderSrc, skew);
+        rotatedRender = rotate(cv, base, skew);
       }
-      const overlaySrc = rotatedRender ?? renderSrc;
+      const overlaySrc = rotatedRender ?? base;
       drawOn(overlaySrc);
       const width = overlaySrc.cols;
       const height = overlaySrc.rows;
@@ -396,9 +414,18 @@ const api = {
     const src = cv.matFromImageData(imageData);
     let work: CvAny | null = null;
     let skewAngleDegrees = 0;
+    const osdAngleDegrees = input.osdAngleDegrees === 180 ? 180 : 0;
     try {
       work = new cv.Mat();
       cv.cvtColor(src, work, cv.COLOR_RGBA2GRAY);
+
+      if (osdAngleDegrees === 180) {
+        // 180° is a dimension-preserving flip — same output width/height.
+        const flipped = new cv.Mat();
+        cv.rotate(work, flipped, cv.ROTATE_180);
+        work.delete();
+        work = flipped;
+      }
 
       if (input.denoiseRadius > 0) {
         const radius = input.denoiseRadius * 2 + 1;
@@ -446,6 +473,7 @@ const api = {
           height,
           thumbnailDataUrl,
           skewAngleDegrees,
+          osdAngleDegrees,
         },
         [transferable],
       );

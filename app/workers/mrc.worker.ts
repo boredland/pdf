@@ -12,6 +12,8 @@ export interface MrcInput {
   /** Rotate the render by this angle (degrees) before inpainting so mask
    * and background share the preprocessed (deskewed) coordinate system. */
   skewAngleDegrees?: number;
+  /** OSD cardinal pre-rotation applied by preprocess (0 or 180). */
+  osdAngleDegrees?: 0 | 180;
 }
 
 export interface MrcOutput {
@@ -66,6 +68,16 @@ function toCanvasRotated(
   ctx.translate(-bitmap.width / 2, -bitmap.height / 2);
   ctx.drawImage(bitmap, 0, 0);
   return { canvas, ctx };
+}
+
+async function rotate180Bitmap(bitmap: ImageBitmap): Promise<ImageBitmap> {
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2d ctx unavailable");
+  ctx.translate(bitmap.width, bitmap.height);
+  ctx.rotate(Math.PI);
+  ctx.drawImage(bitmap, 0, 0);
+  return canvas.transferToImageBitmap();
 }
 
 async function encode(canvas: OffscreenCanvas, mime: string, quality?: number): Promise<Uint8Array> {
@@ -257,11 +269,16 @@ const api = {
     // Preprocess deskews the image before binarizing; the mask we extract
     // lives in the deskewed coordinate system. To make mask + background
     // compose cleanly, apply the same rotation to the render first.
+    // Stack: OSD cardinal flip (if any) → then fine skew.
+    const osdBitmap =
+      input.osdAngleDegrees === 180
+        ? await rotate180Bitmap(renderBitmap)
+        : renderBitmap;
     const skew = input.skewAngleDegrees ?? 0;
     const { ctx: renderCtx } =
       Math.abs(skew) > 0.05
-        ? toCanvasRotated(renderBitmap, skew)
-        : toCanvas(renderBitmap);
+        ? toCanvasRotated(osdBitmap, skew)
+        : toCanvas(osdBitmap);
     const renderImg = renderCtx.getImageData(0, 0, renderBitmap.width, renderBitmap.height);
     const { canvas: preCanvas } = toCanvas(preBitmap);
     const preImg = preCanvas
