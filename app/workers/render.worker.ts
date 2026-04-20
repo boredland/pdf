@@ -20,7 +20,7 @@ export interface RenderPageOutput {
   thumbnailDataUrl: string;
 }
 
-const THUMBNAIL_MAX_SIDE = 160;
+const THUMBNAIL_MAX_SIDE = 320;
 
 const api = {
   async getPageCount(pdfBytes: ArrayBuffer): Promise<number> {

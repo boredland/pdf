@@ -34,7 +34,7 @@ export interface MrcOutput {
   meanAbsoluteDifference: number;
 }
 
-const THUMB_MAX_SIDE = 160;
+const THUMB_MAX_SIDE = 320;
 
 async function decodePng(bytes: ArrayBuffer): Promise<ImageBitmap> {
   const blob = new Blob([bytes], { type: "image/png" });

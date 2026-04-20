@@ -58,7 +58,7 @@ export interface PreprocessOutput {
   osdAngleDegrees: OsdCardinal;
 }
 
-const THUMB_MAX_SIDE = 160;
+const THUMB_MAX_SIDE = 320;
 
 async function decodePng(bytes: ArrayBuffer): Promise<ImageData> {
   const blob = new Blob([bytes], { type: "image/png" });
