@@ -86,10 +86,9 @@
       but builds are flaky — vendor our own if needed.
 - [ ] Real JPEG 2000 encoder for the background layer (current output is
       JPEG via Canvas). openjpeg-wasm is the candidate.
-- [ ] Use PDF native /ImageMask for the mask layer instead of an alpha
-      PNG. Requires dropping from pdf-lib's high-level API to PDFDict
-      internals, but it's the canonical MRC representation and lets
-      viewers avoid compositing cost.
+- [x] PDF native /ImageMask for the mask layer (1 bit per pixel +
+      flate instead of 32-bpp alpha PNG). Drops skew.pdf output from
+      7.6× to 2.0× of source.                             (shipped)
 - [ ] Skip MRC split entirely for pure-B&W pages — emit a single bitonal
       image. Saves the background-layer bytes.
 - [ ] cardinal.pdf still compresses at ~12× source even on compact

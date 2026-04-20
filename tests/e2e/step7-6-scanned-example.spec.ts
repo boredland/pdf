@@ -136,11 +136,18 @@ test.describe("scanned example fixture (OCRmyPDF skew.pdf)", () => {
         ),
       };
     });
-    // Previously the builder embedded the full-res composed PNG per page,
-    // which pushed the output to ~18× the source. The mask+bg split + mask
-    // downsampling drops it to ~7-8×. True DjVu-class sizes still need a
-    // real JBIG2 mask encoder — tracked in todo.txt.
+    console.log(
+      "compression:",
+      JSON.stringify({
+        ...sizes,
+        ratio: (sizes.built / sizes.source).toFixed(2),
+      }),
+    );
+    // Previously 18× (embedded full-res composed PNG). After the mask+bg
+    // split + mask downsample + native /ImageMask, we land well under 3×.
+    // Loose 5× ceiling catches regressions without hair-triggering on
+    // font/encoder noise.
     expect(sizes.built).toBeGreaterThan(0);
-    expect(sizes.built / sizes.source).toBeLessThan(10);
+    expect(sizes.built / sizes.source).toBeLessThan(5);
   });
 });

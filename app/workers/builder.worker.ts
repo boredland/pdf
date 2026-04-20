@@ -1,6 +1,16 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import {
+  PDFDocument,
+  PDFRawStream,
+  StandardFonts,
+  drawObject,
+  popGraphicsState,
+  pushGraphicsState,
+  scale,
+  setFillingGrayscaleColor,
+  translate,
+} from "pdf-lib";
 import type { OcrResult, OcrWord } from "~/lib/providers/types";
 
 export interface BuilderPageInput {
@@ -38,9 +48,9 @@ const api = {
       const { pageWidthPt: pageW, pageHeightPt: pageH } = pageInput;
       const page = doc.addPage([pageW, pageH]);
 
-      // MRC assembly: embed the lossy background layer first, then the
-      // bitonal mask (white pixels made transparent) on top. Viewers
-      // composite them into the familiar DjVu-style scan.
+      // MRC assembly: lossy background first, then a PDF native /ImageMask
+      // XObject on top. The mask is 1 bit per pixel (packed) + flate —
+      // typically 5-10× smaller than the 32-bit RGBA alpha-PNG it replaces.
       const bgBytes = new Uint8Array(pageInput.bgBytes);
       const bgImage =
         pageInput.bgMimeType === "image/jpeg"
@@ -48,11 +58,13 @@ const api = {
           : await doc.embedPng(bgBytes);
       page.drawImage(bgImage, { x: 0, y: 0, width: pageW, height: pageH });
 
-      const transparentMask = await maskToTransparentPng(
+      await drawMaskAsImageMask(
+        doc,
+        page,
         new Uint8Array(pageInput.maskPngBytes),
+        pageW,
+        pageH,
       );
-      const maskImage = await doc.embedPng(transparentMask);
-      page.drawImage(maskImage, { x: 0, y: 0, width: pageW, height: pageH });
 
       // Overlay invisible OCR words. opacity:0 renders the text into the
       // content stream (so PDF viewers extract it) without painting pixels.
@@ -72,41 +84,111 @@ const api = {
 };
 
 /**
- * Convert a bitonal black-on-white mask PNG into a PNG with transparent
- * white pixels, so it composites cleanly over the background layer.
- * The mask's pixels vote by luminance: brighter than the threshold → alpha 0,
- * darker → fully opaque black. This is the simplest MRC composite mode
- * that pdf-lib can express without dropping to PDFDict internals.
+ * Draw a bitonal mask onto a page as a PDF native /ImageMask XObject.
+ *
+ * The mask is stored as 1 bit per pixel (MSB-first, row padded to byte)
+ * with /FlateDecode compression. In PDF semantics a 0 bit paints with the
+ * current non-stroking fill colour; a 1 bit is transparent. We set fill
+ * to pure black (grayscale 0) so mask pixels render as the scan's text.
+ *
+ * Replaces the previous "alpha PNG over bg" approach, which embedded a
+ * 32-bpp RGBA stream — ~8× larger on the same content.
  */
-async function maskToTransparentPng(maskPng: Uint8Array): Promise<Uint8Array> {
+async function drawMaskAsImageMask(
+  doc: PDFDocument,
+  page: ReturnType<PDFDocument["addPage"]>,
+  maskPng: Uint8Array,
+  pageWidthPt: number,
+  pageHeightPt: number,
+) {
   const blob = new Blob([maskPng.slice().buffer], { type: "image/png" });
   const bitmap = await createImageBitmap(blob);
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const widthPx = bitmap.width;
+  const heightPx = bitmap.height;
+
+  const canvas = new OffscreenCanvas(widthPx, heightPx);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2d ctx unavailable");
   ctx.drawImage(bitmap, 0, 0);
   bitmap.close?.();
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = img.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const lum = data[i]!; // mask is grayscale, R=G=B
-    if (lum >= 128) {
-      // background / non-text pixel → make fully transparent.
-      data[i] = 255;
-      data[i + 1] = 255;
-      data[i + 2] = 255;
-      data[i + 3] = 0;
-    } else {
-      // text pixel → fully opaque black.
-      data[i] = 0;
-      data[i + 1] = 0;
-      data[i + 2] = 0;
-      data[i + 3] = 255;
+  const { data } = ctx.getImageData(0, 0, widthPx, heightPx);
+
+  // Pack into 1 bit per pixel, MSB-first, row-padded to byte.
+  const bytesPerRow = Math.ceil(widthPx / 8);
+  const packed = new Uint8Array(bytesPerRow * heightPx);
+  for (let y = 0; y < heightPx; y++) {
+    const rowOffset = y * bytesPerRow;
+    for (let x = 0; x < widthPx; x++) {
+      const lum = data[(y * widthPx + x) * 4]!;
+      // 0 = paint (text), 1 = transparent (background).
+      if (lum >= 128) {
+        packed[rowOffset + (x >> 3)]! |= 1 << (7 - (x & 7));
+      }
     }
   }
-  ctx.putImageData(img, 0, 0);
-  const outBlob = await canvas.convertToBlob({ type: "image/png" });
-  return new Uint8Array(await outBlob.arrayBuffer());
+
+  // Flate via CompressionStream (available in modern workers).
+  const deflated = await compressDeflate(packed);
+
+  // Build the XObject dict. PDFContext.obj() accepts a plain object and
+  // wraps values in the right PDF primitives.
+  const dict = doc.context.obj({
+    Type: "XObject",
+    Subtype: "Image",
+    Width: widthPx,
+    Height: heightPx,
+    BitsPerComponent: 1,
+    ImageMask: true,
+    Filter: "FlateDecode",
+    Length: deflated.byteLength,
+  });
+  const stream = PDFRawStream.of(dict, deflated);
+  const ref = doc.context.register(stream);
+
+  // Register XObject in page resources; the returned name is what the
+  // content stream references via `/Name Do`.
+  const name = page.node.newXObject("Mask", ref);
+
+  // Emit: save state, set fill = black, translate/scale to page size,
+  // draw the mask XObject, restore.
+  page.pushOperators(
+    pushGraphicsState(),
+    setFillingGrayscaleColor(0),
+    translate(0, 0),
+    scale(pageWidthPt, pageHeightPt),
+    drawObject(name),
+    popGraphicsState(),
+  );
+}
+
+async function compressDeflate(bytes: Uint8Array): Promise<Uint8Array> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const CS = (self as any).CompressionStream as
+    | (new (format: string) => {
+        readable: ReadableStream<Uint8Array>;
+        writable: WritableStream<Uint8Array>;
+      })
+    | undefined;
+  if (!CS) throw new Error("CompressionStream not available");
+  const cs = new CS("deflate");
+  const writer = cs.writable.getWriter();
+  void writer.write(bytes);
+  void writer.close();
+  const chunks: Uint8Array[] = [];
+  const reader = cs.readable.getReader();
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value) chunks.push(value);
+  }
+  const totalLen = chunks.reduce((n, c) => n + c.byteLength, 0);
+  const out = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.byteLength;
+  }
+  return out;
 }
 
 function drawInvisibleWord(
