@@ -23,6 +23,10 @@ export interface MrcArtifactManifest {
   originalBytes: number;
   meanAbsoluteDifference: number;
   preset: Project["settings"]["mrc"]["preset"];
+  /** Fraction 0–1 of mask pixels that were classified as text. */
+  maskCoverage: number;
+  /** True iff the builder should skip the mask layer for this page. */
+  skipMask: boolean;
 }
 
 function isAborted(signal?: AbortSignal) {
@@ -160,6 +164,8 @@ export async function runMrcPipeline(
         originalBytes: result.originalBytes,
         meanAbsoluteDifference: result.meanAbsoluteDifference,
         preset: project.settings.mrc.preset,
+        maskCoverage: result.maskCoverage,
+        skipMask: result.skipMask,
       };
       const manifestJson = JSON.stringify(manifest);
       await writeFile(manifestPath, new TextEncoder().encode(manifestJson));

@@ -32,6 +32,17 @@ export interface MrcOutput {
   bgThumbnailDataUrl: string;
   composedThumbnailDataUrl: string;
   meanAbsoluteDifference: number;
+  /** Fraction (0–1) of the mask that is text. <0.005 = blank; >0.35 = photo-
+   *  dominated page where the mask is mostly noise. Builder uses this to
+   *  decide whether to draw the mask layer at all. */
+  maskCoverage: number;
+  /**
+   * When true, the MRC split wasn't a net win (photo-dominated page) —
+   * callers should skip the mask and embed just the background as the
+   * whole page. Still produces mask/bg bytes so cached artifacts survive a
+   * later preset change.
+   */
+  skipMask: boolean;
 }
 
 const THUMB_MAX_SIDE = 320;
@@ -321,6 +332,14 @@ const api = {
     }
 
     const mask = extractMask(preImg);
+    let textPixels = 0;
+    for (let i = 0; i < mask.length; i++) if (mask[i] === 1) textPixels++;
+    const maskCoverage = mask.length > 0 ? textPixels / mask.length : 0;
+    // < 0.5% = essentially blank; > 35% = photo misinterpreted as text.
+    // Either way the mask layer isn't buying us anything and we just burn
+    // bytes on it. The bg layer (which inpaints over the mask) is a
+    // legitimate representation of the page on its own.
+    const skipMask = maskCoverage < 0.005 || maskCoverage > 0.35;
     const inpainted = inpaintBackground(renderImg, mask);
     const bgStage = await downsample(inpainted, width, height, config.bgScale);
     const bgBlob = await bgStage.canvas.convertToBlob({
@@ -371,6 +390,8 @@ const api = {
     return Comlink.transfer(
       {
         pageIndex: input.pageIndex,
+        maskCoverage,
+        skipMask,
         maskPngBytes: maskTransfer,
         bgImageBytes: bgTransfer,
         bgMimeType: config.bgMime,

@@ -20,6 +20,8 @@ export interface BuilderPageInput {
   bgBytes: ArrayBuffer;
   /** MIME type for bgBytes — "image/jpeg" or "image/png". */
   bgMimeType: string;
+  /** When true, skip the mask overlay (photo-dominated or blank page). */
+  skipMask?: boolean;
   ocr: OcrResult;
   /** Physical page size in points (PDF default is 72dpi). */
   pageWidthPt: number;
@@ -58,13 +60,18 @@ const api = {
           : await doc.embedPng(bgBytes);
       page.drawImage(bgImage, { x: 0, y: 0, width: pageW, height: pageH });
 
-      await drawMaskAsImageMask(
-        doc,
-        page,
-        new Uint8Array(pageInput.maskPngBytes),
-        pageW,
-        pageH,
-      );
+      // Skip the mask overlay for blank or photo-dominated pages — the
+      // MRC split flagged this upstream and the bg alone is a faithful
+      // representation. Saves the per-page mask bytes.
+      if (!pageInput.skipMask) {
+        await drawMaskAsImageMask(
+          doc,
+          page,
+          new Uint8Array(pageInput.maskPngBytes),
+          pageW,
+          pageH,
+        );
+      }
 
       // Overlay invisible OCR words. opacity:0 renders the text into the
       // content stream (so PDF viewers extract it) without painting pixels.

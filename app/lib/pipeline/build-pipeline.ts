@@ -125,6 +125,7 @@ export async function runBuildPipeline(
         maskPngBytes: await maskBlob.arrayBuffer(),
         bgBytes: await bgBlob.arrayBuffer(),
         bgMimeType: manifest.bgMimeType,
+        skipMask: manifest.skipMask,
         ocr,
         pageWidthPt: widthPt,
         pageHeightPt: heightPt,

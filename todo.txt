@@ -20,13 +20,9 @@
 - [x] Image upload fix + step11 spec                 0a4232c
 
 ## Pipeline parallelism
-- [ ] Drive the pipeline as a per-page DAG: page N moves on to its next
-      stage as soon as its upstream artifact is ready, instead of the
-      current "stage-wide barrier" where all pages finish render before
-      any page can start preprocess. Touches render/preprocess/detect/
-      ocr/mrc pipelines and the orchestrator. Keep build as the only
-      project-scoped join. Expected win: 1.5-2× throughput on multi-
-      page docs today.
+- [x] Per-page DAG scheduling in runFromStage. Each page walks
+      render→preprocess→detect→ocr→mrc independently; build is the
+      only project-wide join.                             (shipped)
 
 ## Step 10 — Polish (remaining)
 - [ ] Keyboard navigation across full UI (tab order, focus rings, shortcuts)
@@ -36,7 +32,9 @@
       export (step13 e2e spec)                              (shipped)
 - [x] Asset-cache pane polish: per-bucket rows with entry counts,
       per-bucket purge, online/offline pill indicator.        (shipped)
-- [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
+- [x] Error-state surfaces: failed stage events show up as dismissable
+      red banners under the job progress bar, deduped by (stage,page).
+                                                              (shipped)
 - [x] Display original vs. built PDF size (and the delta) on the project
       header so users see the MRC compression payoff (or penalty).
 - [x] Per-page "remove" control. Wipes the page's OPFS artifacts,
@@ -89,15 +87,17 @@
 - [x] PDF native /ImageMask for the mask layer (1 bit per pixel +
       flate instead of 32-bpp alpha PNG). Drops skew.pdf output from
       7.6× to 2.0× of source.                             (shipped)
-- [ ] Skip MRC split entirely for pure-B&W pages — emit a single bitonal
-      image. Saves the background-layer bytes.
-- [ ] cardinal.pdf still compresses at ~12× source even on compact
-      (75.1 KB → 913.5 KB = +1117%). Mixed text+photo pages defeat
-      the current MRC split: the background is already JPEG-compressed
-      in the source, so re-encoding at 0.5 quality isn't a gain, and
-      the mask captures less because photo regions have no "text to
-      mask". Investigate: detect photo-dominated pages and drop the
-      mask entirely (just re-embed the source image).
+- [x] MRC worker measures mask coverage and sets skipMask=true when
+      it's <0.5% (blank) or >35% (photo-dominated). Builder then
+      omits the /ImageMask overlay for those pages.         (shipped)
+- [ ] cardinal.pdf 77 KB → 674 KB (8.8×) is still bad — mask coverage
+      lands in the valid text-heavy band (~7.5%) so skipMask doesn't
+      fire, but the bg layer alone (JPEG 0.5 quality, 0.5 scale)
+      overshoots the source because the source PDF already embeds
+      high-quality JPEGs we re-decode + re-encode at lower settings.
+      Better fix: extract the original image XObjects from the source
+      PDF and embed them directly when they're present, bypassing MRC
+      for photo-heavy pages. Requires mupdf image extraction.
 - [ ] Investigate zstd PDF stream filtering (PDF 2.0 feature) for
       non-image streams — mupdf support TBD.
 
@@ -109,8 +109,9 @@
 - [ ] Tests that still run real Tesseract (step5, step6, step7-6, step8
       invisible-text) pull eng.traineddata from jsDelivr on first run — brittle
       in CI without a warm SW cache. Consider pre-seeding via a global setup.
-- [ ] The "mock" OCR provider is registered in prod bundles too. Harmless
-      but noisy; gate behind a build flag or the testing harness.
+- [x] Mock OCR provider no longer registered in the default registry.
+      The harness registers it lazily when tests call
+      `testing.setDefaultOcrProvider("mock")`.             (shipped)
 - [ ] No e2e coverage for: dropping a real PDF via the drop zone (we go
       through the harness), abort during build, OPFS quota exhaustion.
 - [ ] `optimize-mask` threshold is hard-coded at 128 — no exposure in
