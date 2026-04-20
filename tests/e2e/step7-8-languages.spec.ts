@@ -8,6 +8,7 @@ async function waitForHarness(page: Page) {
 
 async function bootstrapProject(page: Page) {
   await page.getByTestId("load-example-synthetic").click();
+  await page.getByTestId("run-stage-button").click();
   await expect(page.getByTestId("page-card-0")).toHaveAttribute(
     "data-render-status",
     "done",
@@ -174,6 +175,7 @@ test.describe("detail pane — detect tab overlay", () => {
 
   test("detect tab image is the overlay PNG with drawn bboxes", async ({ page }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-detect-status",
       "done",

@@ -211,6 +211,7 @@ test.describe("step 6 — Gemini provider", () => {
     page,
   }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     const panel = page.getByTestId("api-keys-panel");
     await expect(panel).toBeVisible();
     await page.getByTestId("api-keys-passphrase").fill("hunter2");

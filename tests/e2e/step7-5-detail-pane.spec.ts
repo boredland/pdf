@@ -31,6 +31,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     page,
   }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-mrc-status",
       "done",
@@ -48,6 +49,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
 
   test("each tab shows the corresponding stage artifact", async ({ page }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-mrc-status",
       "done",
@@ -145,6 +147,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     // render artifacts (already covered by the per-page test above); here we
     // assert the stage-picker element exists once a project is loaded.
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("stage-picker")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId("run-stage-button")).toBeVisible();
 
@@ -155,6 +158,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
 
   test("detail pane closes via the close button", async ({ page }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-mrc-status",
       "done",

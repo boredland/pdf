@@ -92,6 +92,7 @@ test.describe("step 5 — Tesseract OCR", () => {
 
   test("full pipeline surfaces ocr-status=done for every page", async ({ page }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     for (const idx of [0, 1, 2]) {
       await expect(page.getByTestId(`page-card-${idx}`)).toHaveAttribute(
         "data-ocr-status",
@@ -121,6 +122,7 @@ test.describe("step 5 — Tesseract OCR", () => {
   }) => {
     // Warm the caches first.
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-ocr-status",
       "done",

@@ -93,6 +93,7 @@ test.describe("step 3 — preprocess worker + rewind", () => {
     page,
   }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-preprocess-status",
       "done",

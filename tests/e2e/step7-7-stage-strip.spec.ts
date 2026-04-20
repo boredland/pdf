@@ -8,6 +8,7 @@ async function waitForHarness(page: Page) {
 
 async function bootstrapFull(page: Page) {
   await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
   await expect(page.getByTestId("page-card-0")).toHaveAttribute(
     "data-mrc-status",
     "done",
@@ -108,6 +109,7 @@ test.describe("step 7.7 — per-stage thumbs + image modal", () => {
     // last active project after ingest, not an arbitrary one. So use the
     // load-example path but then rewind to create partial state.
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-render-status",
       "done",

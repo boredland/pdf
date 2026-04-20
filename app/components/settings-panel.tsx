@@ -1,3 +1,4 @@
+import { useLiveQuery } from "dexie-react-hooks";
 import type { Project } from "~/lib/storage/db";
 import { getDb } from "~/lib/storage/db";
 import { listProviders } from "~/lib/providers/registry";
@@ -33,7 +34,16 @@ export function SettingsPanel({
     });
   }
 
-  const providers = listProviders();
+  const keyedProviderIds = useLiveQuery(
+    async () => (await getDb().apiKeys.toArray()).map((row) => row.providerId),
+    [],
+  );
+  // Hosted providers only appear in the dropdown once a key has been saved;
+  // nothing is more confusing than a dropdown that lets you pick a provider
+  // that can't actually run.
+  const providers = listProviders().filter(
+    (p) => p.kind !== "hosted" || (keyedProviderIds ?? []).includes(p.id),
+  );
 
   return (
     <form

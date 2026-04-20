@@ -45,30 +45,20 @@ export function ProjectView() {
   const runningStages = useProgressMap(activeProjectId);
 
   const ingest = useCallback(async (name: string, bytes: ArrayBuffer) => {
+    // Project creation only: we deliberately don't auto-run the pipeline.
+    // The user should review settings (languages, OCR provider, MRC preset,
+    // preprocess toggles) *before* anything kicks off — pipelines run only
+    // once they click the Run button.
     setError(null);
     setIsBusy(true);
-    const controller = new AbortController();
-    abortRef.current = controller;
     try {
       const next = await createProjectFromBytes(name, bytes);
       setActiveProjectId(next.id);
       await ensurePageRows(next);
-      const fresh = await getDb().projects.get(next.id);
-      if (!fresh) throw new Error("project vanished");
-      await runRenderPipeline(fresh, { signal: controller.signal });
-      if (controller.signal.aborted) return;
-      await runPreprocessPipeline(fresh, { signal: controller.signal });
-      if (controller.signal.aborted) return;
-      await runDetectPipeline(fresh, { signal: controller.signal });
-      if (controller.signal.aborted) return;
-      await runOcrPipeline(fresh, { signal: controller.signal });
-      if (controller.signal.aborted) return;
-      await runMrcPipeline(fresh, { signal: controller.signal });
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setIsBusy(false);
-      abortRef.current = null;
     }
   }, []);
 
@@ -189,7 +179,7 @@ export function ProjectView() {
                     type="button"
                     onClick={() => void onRunStage()}
                     data-testid="run-stage-button"
-                    className="rounded-md bg-sky-500/20 px-3 py-1 text-sm text-sky-200 hover:bg-sky-500/30"
+                    className="rounded-md bg-sky-500/20 px-3 py-1.5 text-sm font-medium text-sky-200 hover:bg-sky-500/30"
                   >
                     Run
                   </button>

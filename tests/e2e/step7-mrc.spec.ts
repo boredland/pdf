@@ -79,6 +79,7 @@ test.describe("step 7 — MRC split + compression", () => {
 
   test("full pipeline flips mrc-status=done on every card", async ({ page }) => {
     await page.getByTestId("load-example-synthetic").click();
+    await page.getByTestId("run-stage-button").click();
     for (const idx of [0, 1, 2]) {
       await expect(page.getByTestId(`page-card-${idx}`)).toHaveAttribute(
         "data-mrc-status",

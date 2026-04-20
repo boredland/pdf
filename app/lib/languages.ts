@@ -13,12 +13,14 @@ export interface LanguageInfo {
 export const LANGUAGES: LanguageInfo[] = [
   { code: "eng", name: "English", script: "Latin" },
   { code: "deu", name: "German", script: "Latin" },
+  { code: "deu_frak", name: "German (Fraktur)", script: "Latin / blackletter" },
   { code: "fra", name: "French", script: "Latin" },
   { code: "spa", name: "Spanish", script: "Latin" },
   { code: "ita", name: "Italian", script: "Latin" },
   { code: "por", name: "Portuguese", script: "Latin" },
   { code: "nld", name: "Dutch", script: "Latin" },
   { code: "pol", name: "Polish", script: "Latin" },
+  { code: "lat", name: "Latin", script: "Latin" },
   { code: "rus", name: "Russian", script: "Cyrillic" },
   { code: "ukr", name: "Ukrainian", script: "Cyrillic" },
   { code: "ara", name: "Arabic", script: "Arabic" },
@@ -33,7 +35,9 @@ export const LANGUAGES: LanguageInfo[] = [
   { code: "vie", name: "Vietnamese", script: "Latin" },
 ];
 
-export const CDN_LANG_BASE = "https://tessdata.projectnaptha.com/4.0/";
+// Full (not _fast) so we get niche models like deu_frak. The _fast variant
+// drops blackletter and a few other specialised trainings.
+export const CDN_LANG_BASE = "https://tessdata.projectnaptha.com/4.0.0/";
 const BASE = import.meta.env.BASE_URL;
 const LOCAL_LANG_PATH = `${BASE}tesseract/`;
 export const LOCAL_PREBUILT_LANGS = new Set(["eng"]);
