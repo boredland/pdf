@@ -1,21 +1,23 @@
 # OCR app — remaining work
 
 ## Done (commits)
-- [x] Step 0  Scaffold                             75925b7
-- [x] Step 1  Storage + artifacts + SW             3b5231f
-- [x] Step 2  PDF ingest + render                  cf25c87
-- [x] Step 3  OpenCV preprocess                    314368d
-- [x] Step 4  Text-region detection                9dfb8ee
-- [x] Step 5  Tesseract OCR                        480db94
-- [x] Step 6  Gemini hosted provider               c7a90e7
-- [x] Step 7  MRC split (JBIG2 + JP2)              15dbb2d
-- [x] Step 7.5 Per-page detail pane                a1a967c
-- [x] Step 8  PDF builder + text layer             8d3a845
-- [x] Step 9  Orchestrator + resume + confirm      2ae9b5f
-- [x] Manual  cardinal.pdf example                 f12ffbd
-- [x] Manual  mask PNG optimization                dcba3f4
-- [x] Manual  Auto image rotation (EXIF+content)   bef25c2
-- [x] Manual  Document 180° rotation limitation    238966a
+- [x] Step 0   Scaffold                              75925b7
+- [x] Step 1   Storage + artifacts + SW              3b5231f
+- [x] Step 2   PDF ingest + render                   cf25c87
+- [x] Step 3   OpenCV preprocess                     314368d
+- [x] Step 4   Text-region detection                 9dfb8ee
+- [x] Step 5   Tesseract OCR                         480db94
+- [x] Step 6   Gemini hosted provider                c7a90e7
+- [x] Step 7   MRC split (JBIG2 + JP2)               15dbb2d
+- [x] Step 7.5 Per-page detail pane                  a1a967c
+- [x] Step 8   PDF builder + text layer              8d3a845
+- [x] Step 9   Orchestrator + resume + confirm       2ae9b5f
+- [x] Manual   cardinal.pdf example                  f12ffbd
+- [x] Manual   mask PNG optimization                 dcba3f4
+- [x] Manual   Auto image rotation (EXIF+content)    bef25c2
+- [x] Manual   Document 180° rotation limitation     238966a
+- [x] E2E speedup (~7m → 2m20s) + mask-worker fix    7fc8988
+- [x] Image upload fix + step11 spec                 0a4232c
 
 ## Step 10 — Polish (remaining)
 - [ ] Keyboard navigation across full UI (tab order, focus rings, shortcuts)
@@ -25,11 +27,38 @@
 - [ ] Asset-cache pane polish (sizes, purge per-asset, online/offline state)
 - [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
 
+## Rotation detection without EXIF
+- [ ] Explore Tesseract OSD (Orientation and Script Detection) as a standalone
+      worker step. Requires:
+        - ship osd.traineddata alongside eng.traineddata (public/tesseract/)
+        - route its fetch through the SW traineddata cache so it works offline
+        - add a timeout + fallback so a slow/missing OSD doesn't stall ingest
+        - wire it into the preprocess stage, not the image→PDF ingest path
+        - e2e spec: upside-down scan → OSD detects → preprocess rotates →
+          OCR text reads right-side up
+- [ ] HoughLines skew detection in preprocess (already partly there; verify
+      it survives the ingest-path cleanup)
+- [ ] Provide a manual "rotate page" control in the detail pane as an escape
+      hatch when detection gets it wrong
+
 ## Deferred follow-ups (from memory)
-- [ ] pino-style structured browser logging
+- [ ] pino-style structured browser logging (replace ad-hoc console.warn)
 - [ ] Multi-provider readiness (Mistral OCR, Doubleword, Gemma) behind registry
-- [ ] Language detection (Kreuzberg-inspired)
-- [ ] Real JBIG2 / JP2 encoders (replace current stand-ins) — post-v1
+- [ ] Language detection (Kreuzberg-inspired) — auto-pick traineddata by
+      sampling a few pages before full OCR
+- [ ] Real JBIG2 / JP2 encoders (current MRC output uses PNG/JPEG stand-ins)
+
+## Known-broken / untested corners surfaced during the speedup pass
+- [ ] Tests that still run real Tesseract (step5, step6, step7-6, step8
+      invisible-text) pull eng.traineddata from jsDelivr on first run — brittle
+      in CI without a warm SW cache. Consider pre-seeding via a global setup.
+- [ ] The "mock" OCR provider is registered in prod bundles too. Harmless
+      but noisy; gate behind a build flag or the testing harness.
+- [ ] No e2e coverage for: dropping a real PDF via the drop zone (we go
+      through the harness), abort during build, OPFS quota exhaustion.
+- [ ] `optimize-mask` threshold is hard-coded at 128 — no exposure in
+      settings, no visual regression. Fine today, flag if it starts
+      clipping antialiased masks.
 
 ## Stretch (post-v1)
 - [ ] CRAFT ONNX text detector (swap MSER when better IoU proven)
@@ -37,7 +66,3 @@
 - [ ] Dewarping (book-spine curvature)
 - [ ] Batch import (ZIP / multi-PDF)
 - [ ] Export hOCR / ALTO XML
-
-## 180° rotation gap (open)
-- [ ] Investigate OSD (Tesseract orientation detection) or script-based
-      heuristic to catch upside-down scans lacking EXIF orientation
