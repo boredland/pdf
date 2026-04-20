@@ -137,7 +137,7 @@ export function ApiKeysPanel() {
                 type="button"
                 onClick={() => void forgetApiKey(row.providerId)}
                 data-testid={`api-keys-forget-${row.providerId}`}
-                className="text-slate-500 hover:text-red-300"
+                className="text-slate-400 hover:text-red-300"
               >
                 forget
               </button>

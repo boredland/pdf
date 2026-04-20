@@ -315,7 +315,7 @@ function DetectView({ project, page }: { project: Project; page: Page }) {
   const overlayPath = page.status.detect?.overlayPath ?? page.status.render?.artifactPath;
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-400">
         Overlay image shows detected text-region bounding boxes drawn on the original page.
       </p>
       <ImageArtifact path={overlayPath} testId="detail-image" />
@@ -457,7 +457,7 @@ function MrcView({ project, page }: { project: Project; page: Page }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="uppercase tracking-wide text-[10px] text-slate-500">{label}</dt>
+      <dt className="uppercase tracking-wide text-[10px] text-slate-400">{label}</dt>
       <dd className="text-slate-200">{value}</dd>
     </div>
   );
@@ -465,7 +465,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="rounded border border-dashed border-slate-700 p-8 text-center text-xs text-slate-500">
+    <div className="rounded border border-dashed border-slate-700 p-8 text-center text-xs text-slate-400">
       {label}
     </div>
   );

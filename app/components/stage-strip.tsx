@@ -73,7 +73,7 @@ function buildSlots(page: Page): Slot[] {
             data-testid="image-modal-ocr-text"
             className="max-h-[85vh] min-w-[20rem] overflow-auto border-l border-slate-800 bg-slate-950 p-4 text-xs text-slate-200"
           >
-            <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-500">
+            <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-400">
               {result.words.length} words · {result.providerId}
             </p>
             <pre className="whitespace-pre-wrap break-words">{result.text}</pre>
@@ -160,7 +160,7 @@ export function StageStrip({ page }: { page: Page }) {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-[9px] uppercase tracking-wide text-slate-600">
+                <div className="flex h-full items-center justify-center text-[9px] uppercase tracking-wide text-slate-400">
                   {slot.label}
                 </div>
               )}

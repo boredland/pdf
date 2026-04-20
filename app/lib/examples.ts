@@ -1,3 +1,5 @@
+import { logger } from "~/lib/logger";
+
 export const EXAMPLE_PDFS = {
   scanned: {
     id: "scanned",
@@ -34,7 +36,6 @@ export async function loadExamplePdf(id: ExampleId = DEFAULT_EXAMPLE_ID): Promis
     // Graceful fallback: the scanned PDF is fetched at postinstall and could
     // be missing in a very fresh checkout before `bun install` completes.
     if (id === "scanned") {
-      const { logger } = await import("~/lib/logger");
       logger.warn({
         evt: "example_fallback",
         requested: "scanned",

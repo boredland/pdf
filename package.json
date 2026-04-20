@@ -23,6 +23,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.2",
     "@playwright/test": "^1.49.0",
     "@tanstack/router-plugin": "^1.95.0",
     "@types/node": "^22.10.0",

@@ -115,7 +115,7 @@ export function LanguagesPanel({ project, disabled }: Props) {
               detected: {scriptHint.script}
             </span>
           )}
-          <span className="text-[10px] uppercase tracking-wide text-slate-500">
+          <span className="text-[10px] uppercase tracking-wide text-slate-400">
             selected: {selected.length === 0 ? "—" : selected.join(" + ")}
           </span>
         </div>
@@ -152,10 +152,10 @@ export function LanguagesPanel({ project, disabled }: Props) {
               <div className="min-w-0 flex-1">
                 <p className="truncate">
                   <span className="font-medium text-slate-200">{lang.name}</span>
-                  <span className="ml-2 font-mono text-[10px] text-slate-500">{lang.code}</span>
+                  <span className="ml-2 font-mono text-[10px] text-slate-400">{lang.code}</span>
                 </p>
                 {lang.script && (
-                  <p className="text-[10px] text-slate-500">{lang.script}</p>
+                  <p className="text-[10px] text-slate-400">{lang.script}</p>
                 )}
               </div>
               {isCached ? (

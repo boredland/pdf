@@ -70,7 +70,7 @@ export function JobProgress({ project }: { project: Project }) {
       data-failure-count={failures.length}
       className="space-y-1"
     >
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-500">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-400">
         <span>
           {progress.stagesDone} / {progress.stagesTotal} steps
         </span>

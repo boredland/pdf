@@ -172,7 +172,7 @@ export function ProjectView() {
               <h2 className="text-xl font-semibold" data-testid="project-name">
                 {project.name}
               </h2>
-              <p className="text-xs text-slate-500" data-testid="project-meta">
+              <p className="text-xs text-slate-400" data-testid="project-meta">
                 {project.pageCount} page{project.pageCount === 1 ? "" : "s"} · {project.id}
               </p>
               <SizeDelta project={project} />
@@ -402,7 +402,7 @@ function PageGrid({
 }) {
   if (pages.length === 0) {
     return (
-      <p className="text-sm text-slate-500" data-testid="pages-empty">
+      <p className="text-sm text-slate-400" data-testid="pages-empty">
         No pages yet. Loading…
       </p>
     );
@@ -448,12 +448,12 @@ function PageGrid({
                     data-testid={`page-thumb-${page.index}`}
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-[10px] text-slate-600">
+                  <div className="flex h-full items-center justify-center text-[10px] text-slate-400">
                     {status === "running" ? "rendering…" : "queued"}
                   </div>
                 )}
               </div>
-              <p className="mt-1 text-center text-[10px] text-slate-500">
+              <p className="mt-1 text-center text-[10px] text-slate-400">
                 page {displayIndex + 1} · {status}
               </p>
             </button>
@@ -469,7 +469,7 @@ function PageGrid({
             <details className="group mt-1" data-testid={`page-details-${page.index}`}>
               <summary
                 data-testid={`page-details-summary-${page.index}`}
-                className="cursor-pointer list-none text-[10px] text-slate-500 hover:text-slate-300"
+                className="cursor-pointer list-none text-[10px] text-slate-400 hover:text-slate-300"
               >
                 <span className="group-open:hidden">▸ show all stages</span>
                 <span className="hidden group-open:inline">▾ hide stages</span>
