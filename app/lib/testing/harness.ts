@@ -18,6 +18,11 @@ import { runMrcPipeline, readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
 import { getPageCount as renderGetPageCount } from "~/lib/workers/render-client";
 import { runStage, runFromStage, PIPELINE_ORDER } from "~/lib/pipeline/run-stage";
+import {
+  computeProgress,
+  predictInvalidation,
+  sumArtifactBytes,
+} from "~/lib/project-progress";
 import { listProviders } from "~/lib/providers/registry";
 import {
   downloadLanguage,
@@ -88,6 +93,11 @@ declare global {
       build: {
         runBuildPipeline: typeof runBuildPipeline;
         readBuildOutput: typeof readBuildOutput;
+      };
+      progress: {
+        compute: typeof computeProgress;
+        predict: typeof predictInvalidation;
+        sumBytes: typeof sumArtifactBytes;
       };
       pipeline: {
         runStage: typeof runStage;
@@ -169,6 +179,11 @@ export function installTestHarness(): void {
     ocr: { runOcrPipeline, readOcrResult, listProviders },
     mrc: { runMrcPipeline, readMrcManifest },
     build: { runBuildPipeline, readBuildOutput },
+    progress: {
+      compute: computeProgress,
+      predict: predictInvalidation,
+      sumBytes: sumArtifactBytes,
+    },
     pipeline: { runStage, runFromStage, order: PIPELINE_ORDER },
     languages: {
       list: LANGUAGES,

@@ -18,6 +18,8 @@ import { SettingsPanel } from "~/components/settings-panel";
 import { ApiKeysPanel } from "~/components/api-keys-panel";
 import { LanguagesPanel } from "~/components/languages-panel";
 import { StageStrip } from "~/components/stage-strip";
+import { JobProgress } from "~/components/job-progress";
+import { computeProgress } from "~/lib/project-progress";
 
 export function ProjectView() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -198,9 +200,10 @@ export function ProjectView() {
                     type="button"
                     onClick={() => void onRunStage()}
                     data-testid="run-stage-button"
+                    data-run-label={getRunLabel(project, pageList)}
                     className="rounded-md bg-sky-500/20 px-3 py-1.5 text-sm font-medium text-sky-200 hover:bg-sky-500/30"
                   >
-                    Run
+                    {getRunLabel(project, pageList)}
                   </button>
                   {project.build && (
                     <button
@@ -227,6 +230,7 @@ export function ProjectView() {
               )}
             </div>
           </header>
+          <JobProgress project={project} />
           <SettingsPanel project={project} disabled={isBusy} />
           <LanguagesPanel project={project} disabled={isBusy} />
           <PageGrid
@@ -245,6 +249,14 @@ export function ProjectView() {
       )}
     </div>
   );
+}
+
+function getRunLabel(project: Project | undefined, pages: Page[]): string {
+  if (!project) return "Run";
+  const progress = computeProgress(project, pages);
+  if (progress.built) return "Re-run";
+  if (progress.partial) return "Resume";
+  return "Run";
 }
 
 function DropZone(props: {

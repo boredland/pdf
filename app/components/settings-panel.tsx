@@ -1,7 +1,16 @@
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { Project } from "~/lib/storage/db";
+import type { Project, Stage } from "~/lib/storage/db";
 import { getDb } from "~/lib/storage/db";
 import { listProviders } from "~/lib/providers/registry";
+import { predictInvalidation, type SettingsInvalidation } from "~/lib/project-progress";
+import { ConfirmModal } from "~/components/confirm-modal";
+
+interface PendingChange {
+  label: string;
+  invalidated: SettingsInvalidation;
+  apply: () => Promise<void>;
+}
 
 export function SettingsPanel({
   project,
@@ -10,28 +19,52 @@ export function SettingsPanel({
   project: Project;
   disabled?: boolean;
 }) {
+  const [pending, setPending] = useState<PendingChange | null>(null);
+
+  async function confirmIfDestructive(
+    label: string,
+    changedStages: Exclude<Stage, "build">[],
+    apply: () => Promise<void>,
+  ) {
+    const invalidated = await predictInvalidation(project.id, changedStages);
+    if (invalidated.artifactCount === 0) {
+      await apply();
+      return;
+    }
+    setPending({ label, invalidated, apply });
+  }
+
   async function update<K extends keyof Project["settings"]["preprocess"]>(
     key: K,
     value: Project["settings"]["preprocess"][K],
   ) {
-    await getDb().projects.update(project.id, {
-      settings: {
-        ...project.settings,
-        preprocess: { ...project.settings.preprocess, [key]: value },
-      },
-    });
+    const apply = async () => {
+      await getDb().projects.update(project.id, {
+        settings: {
+          ...project.settings,
+          preprocess: { ...project.settings.preprocess, [key]: value },
+        },
+      });
+    };
+    await confirmIfDestructive(`preprocess.${String(key)}`, ["preprocess"], apply);
   }
 
   async function updateOcrProvider(id: string) {
-    await getDb().projects.update(project.id, {
-      settings: { ...project.settings, ocr: { ...project.settings.ocr, providerId: id } },
-    });
+    const apply = async () => {
+      await getDb().projects.update(project.id, {
+        settings: { ...project.settings, ocr: { ...project.settings.ocr, providerId: id } },
+      });
+    };
+    await confirmIfDestructive("OCR provider", ["ocr"], apply);
   }
 
   async function updateMrcPreset(preset: Project["settings"]["mrc"]["preset"]) {
-    await getDb().projects.update(project.id, {
-      settings: { ...project.settings, mrc: { preset } },
-    });
+    const apply = async () => {
+      await getDb().projects.update(project.id, {
+        settings: { ...project.settings, mrc: { preset } },
+      });
+    };
+    await confirmIfDestructive("MRC preset", ["mrc"], apply);
   }
 
   const keyedProviderIds = useLiveQuery(
@@ -128,6 +161,43 @@ export function SettingsPanel({
           <option value="compact">Compact (JPEG 50% · half DPI)</option>
         </select>
       </label>
+      {pending && (
+        <ConfirmModal
+          title={`Discard ${pending.invalidated.artifactCount} artifact${
+            pending.invalidated.artifactCount === 1 ? "" : "s"
+          }?`}
+          destructive
+          testId="settings-confirm"
+          message={
+            <div className="space-y-2">
+              <p>
+                Changing <strong>{pending.label}</strong> invalidates{" "}
+                {pending.invalidated.stages.join(", ")} across every affected
+                page.
+              </p>
+              <p className="text-xs text-slate-400">
+                {pending.invalidated.artifactCount} artifact
+                {pending.invalidated.artifactCount === 1 ? "" : "s"} ·{" "}
+                {formatBytes(pending.invalidated.byteCount)} will be dropped on
+                the next run.
+              </p>
+            </div>
+          }
+          confirmLabel="Apply change"
+          onCancel={() => setPending(null)}
+          onConfirm={async () => {
+            const apply = pending.apply;
+            setPending(null);
+            await apply();
+          }}
+        />
+      )}
     </form>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
