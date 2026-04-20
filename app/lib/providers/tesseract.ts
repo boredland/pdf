@@ -1,4 +1,5 @@
 import { createScheduler, createWorker, type Scheduler, type Worker } from "tesseract.js";
+import { langPathFor } from "~/lib/languages";
 import type {
   OcrLine,
   OcrProvider,
@@ -20,6 +21,7 @@ const schedulers = new Map<string, Promise<SchedulerEntry>>();
 async function getScheduler(language: string): Promise<SchedulerEntry> {
   const existing = schedulers.get(language);
   if (existing) return existing;
+  const { langPath, gzip } = langPathFor(language);
   const promise = (async () => {
     const scheduler = createScheduler();
     const workers: Worker[] = [];
@@ -27,8 +29,8 @@ async function getScheduler(language: string): Promise<SchedulerEntry> {
       const worker = await createWorker(language, 1, {
         corePath: `${BASE}tesseract/`,
         workerPath: `${BASE}tesseract/worker.min.js`,
-        langPath: `${BASE}tesseract/`,
-        gzip: false,
+        langPath,
+        gzip,
       });
       workers.push(worker);
       scheduler.addWorker(worker);

@@ -8,6 +8,9 @@ export interface MrcInput {
   preprocessedPngBytes: ArrayBuffer;
   pageIndex: number;
   preset: MrcPreset;
+  /** Rotate the render by this angle (degrees) before inpainting so mask
+   * and background share the preprocessed (deskewed) coordinate system. */
+  skewAngleDegrees?: number;
 }
 
 export interface MrcOutput {
@@ -39,6 +42,23 @@ function toCanvas(bitmap: ImageBitmap): { canvas: OffscreenCanvas; ctx: Offscree
   const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2d ctx unavailable");
+  ctx.drawImage(bitmap, 0, 0);
+  return { canvas, ctx };
+}
+
+function toCanvasRotated(
+  bitmap: ImageBitmap,
+  angleDegrees: number,
+): { canvas: OffscreenCanvas; ctx: OffscreenCanvasRenderingContext2D } {
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2d ctx unavailable");
+  // Fill with white so the out-of-bounds edges don't leak black corners.
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, bitmap.width, bitmap.height);
+  ctx.translate(bitmap.width / 2, bitmap.height / 2);
+  ctx.rotate((angleDegrees * Math.PI) / 180);
+  ctx.translate(-bitmap.width / 2, -bitmap.height / 2);
   ctx.drawImage(bitmap, 0, 0);
   return { canvas, ctx };
 }
@@ -229,7 +249,14 @@ const api = {
     const config = presetConfig(input.preset);
     const renderBitmap = await decodePng(input.renderPngBytes);
     const preBitmap = await decodePng(input.preprocessedPngBytes);
-    const { canvas: renderCanvas, ctx: renderCtx } = toCanvas(renderBitmap);
+    // Preprocess deskews the image before binarizing; the mask we extract
+    // lives in the deskewed coordinate system. To make mask + background
+    // compose cleanly, apply the same rotation to the render first.
+    const skew = input.skewAngleDegrees ?? 0;
+    const { ctx: renderCtx } =
+      Math.abs(skew) > 0.05
+        ? toCanvasRotated(renderBitmap, skew)
+        : toCanvas(renderBitmap);
     const renderImg = renderCtx.getImageData(0, 0, renderBitmap.width, renderBitmap.height);
     const { canvas: preCanvas } = toCanvas(preBitmap);
     const preImg = preCanvas

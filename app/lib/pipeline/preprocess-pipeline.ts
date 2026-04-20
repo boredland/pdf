@@ -120,6 +120,7 @@ export async function runPreprocessPipeline(
             completedAt: Date.now(),
             artifactPath: path,
             sizeBytes: result.pngBytes.byteLength,
+            skewAngleDegrees: result.skewAngleDegrees,
           },
         },
         thumbnailDataUrl: result.thumbnailDataUrl,

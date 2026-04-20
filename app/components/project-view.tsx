@@ -15,6 +15,7 @@ import { progressChannel, type ProgressEvent } from "~/lib/progress";
 import { EXAMPLE_PDFS, loadExamplePdf, type ExampleId } from "~/lib/examples";
 import { SettingsPanel } from "~/components/settings-panel";
 import { ApiKeysPanel } from "~/components/api-keys-panel";
+import { LanguagesPanel } from "~/components/languages-panel";
 import { StageStrip } from "~/components/stage-strip";
 
 export function ProjectView() {
@@ -207,6 +208,7 @@ export function ProjectView() {
             </div>
           </header>
           <SettingsPanel project={project} disabled={isBusy} />
+          <LanguagesPanel project={project} disabled={isBusy} />
           <PageGrid
             pages={pageList}
             running={runningStages}

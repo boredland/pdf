@@ -26,6 +26,8 @@ export interface PageStageStatus {
   sizeBytes?: number;
   /** secondary image artifact path (e.g. detect-overlay.png) */
   overlayPath?: string;
+  /** preprocess: measured skew angle before deskew rotation (degrees) */
+  skewAngleDegrees?: number;
 }
 
 export interface Page {

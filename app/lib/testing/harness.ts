@@ -18,6 +18,12 @@ import { runMrcPipeline, readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { runStage, runFromStage, PIPELINE_ORDER } from "~/lib/pipeline/run-stage";
 import { listProviders } from "~/lib/providers/registry";
 import {
+  downloadLanguage,
+  isLanguageCached,
+  LANGUAGES,
+  traineddataUrl,
+} from "~/lib/languages";
+import {
   clearSessionPassphrase,
   forgetApiKey,
   hasApiKey,
@@ -77,6 +83,12 @@ declare global {
         runFromStage: typeof runFromStage;
         order: typeof PIPELINE_ORDER;
       };
+      languages: {
+        list: typeof LANGUAGES;
+        isCached: typeof isLanguageCached;
+        download: typeof downloadLanguage;
+        url: typeof traineddataUrl;
+      };
       apiKeys: {
         has: typeof hasApiKey;
         store: typeof storeApiKey;
@@ -116,6 +128,12 @@ export function installTestHarness(): void {
     ocr: { runOcrPipeline, readOcrResult, listProviders },
     mrc: { runMrcPipeline, readMrcManifest },
     pipeline: { runStage, runFromStage, order: PIPELINE_ORDER },
+    languages: {
+      list: LANGUAGES,
+      isCached: isLanguageCached,
+      download: downloadLanguage,
+      url: traineddataUrl,
+    },
     apiKeys: {
       has: hasApiKey,
       store: storeApiKey,

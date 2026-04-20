@@ -225,12 +225,13 @@ function ImageArtifact({
 }
 
 function DetectView({ project, page }: { project: Project; page: Page }) {
+  const overlayPath = page.status.detect?.overlayPath ?? page.status.render?.artifactPath;
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500">
         Overlay image shows detected text-region bounding boxes drawn on the original page.
       </p>
-      <ImageArtifact path={page.status.render?.artifactPath} testId="detail-image" />
+      <ImageArtifact path={overlayPath} testId="detail-image" />
       <DetectJson project={project} page={page} />
     </div>
   );

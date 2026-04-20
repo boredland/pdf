@@ -46,6 +46,36 @@ test.describe("scanned example fixture (OCRmyPDF skew.pdf)", () => {
     expect(outcome.renderBytes).toBeGreaterThan(100_000);
   });
 
+  test("MRC background aligns with the deskewed mask (skew angle propagates)", async ({
+    page,
+  }) => {
+    const outcome = await page.evaluate(async () => {
+      const app = window.__pdfApp!;
+      const bytes = await app.example.loadById("scanned");
+      const project = await app.projects.createProjectFromBytes("scanned-mrc-align", bytes);
+      await app.render.ensurePageRows(project);
+      await app.pipeline.runStage(
+        (await app.projects.getProject(project.id))!,
+        "render",
+      );
+      await app.pipeline.runStage(
+        (await app.projects.getProject(project.id))!,
+        "preprocess",
+      );
+      await app.pipeline.runStage(
+        (await app.projects.getProject(project.id))!,
+        "mrc",
+      );
+      const row = await app.db.pages.get(`${project.id}:0`);
+      return {
+        measuredSkew: row?.status.preprocess?.skewAngleDegrees ?? 0,
+        hasMrc: !!row?.status.mrc,
+      };
+    });
+    expect(Math.abs(outcome.measuredSkew)).toBeGreaterThan(0.5);
+    expect(outcome.hasMrc).toBe(true);
+  });
+
   test("full pipeline produces real OCR text with more than the synthetic fixture", async ({
     page,
   }) => {

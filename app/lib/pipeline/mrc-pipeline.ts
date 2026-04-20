@@ -107,6 +107,7 @@ export async function runMrcPipeline(
         preprocessedPngBytes: preBytes,
         pageIndex,
         preset: project.settings.mrc.preset,
+        skewAngleDegrees: page.status.preprocess.skewAngleDegrees ?? 0,
       });
 
       if (isAborted(options.signal)) {

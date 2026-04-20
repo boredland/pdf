@@ -32,7 +32,10 @@ export default defineConfig({
         skipWaiting: true,
         runtimeCaching: [
           {
-            urlPattern: /\.traineddata(\.gz)?$/i,
+            // Callback form (not raw RegExp) matches cross-origin too; the
+            // Tesseract traineddata CDN is on tessdata.projectnaptha.com.
+            urlPattern: ({ url }: { url: URL }) =>
+              /\.traineddata(\.gz)?$/i.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "tesseract-langs",
@@ -41,7 +44,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\.wasm$/i,
+            urlPattern: ({ url }: { url: URL }) => /\.wasm$/i.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "wasm-runtime",
