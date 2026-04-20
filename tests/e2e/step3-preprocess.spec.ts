@@ -92,7 +92,7 @@ test.describe("step 3 — preprocess worker + rewind", () => {
   test("load-example pipeline flips page cards to preprocess:done with deskewed thumbnails", async ({
     page,
   }) => {
-    await page.getByTestId("load-example").click();
+    await page.getByTestId("load-example-synthetic").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-preprocess-status",
       "done",

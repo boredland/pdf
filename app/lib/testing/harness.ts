@@ -26,7 +26,7 @@ import {
   storeApiKey,
 } from "~/lib/api-keys";
 import { rewindToStage } from "~/lib/pipeline/rewind";
-import { EXAMPLE_PDF_URL, loadExamplePdf } from "~/lib/examples";
+import { EXAMPLE_PDFS, loadExamplePdf } from "~/lib/examples";
 
 declare global {
   interface Window {
@@ -88,7 +88,8 @@ declare global {
       rewind: { toStage: typeof rewindToStage };
       example: {
         url: string;
-        load: typeof loadExamplePdf;
+        load: () => Promise<ArrayBuffer>;
+        loadById: typeof loadExamplePdf;
       };
     };
     __pdfRenderCallCount?: number;
@@ -124,6 +125,11 @@ export function installTestHarness(): void {
       hasPassphrase: hasSessionPassphrase,
     },
     rewind: { toStage: rewindToStage },
-    example: { url: EXAMPLE_PDF_URL, load: loadExamplePdf },
+    example: {
+      url: EXAMPLE_PDFS.synthetic.url,
+      // Back-compat: tests depending on exact OCR text pass through synthetic.
+      load: () => loadExamplePdf("synthetic"),
+      loadById: loadExamplePdf,
+    },
   };
 }

@@ -25,7 +25,7 @@ test.describe("step 2 — render worker", () => {
   });
 
   test("load-example streams thumbnails into the page grid", async ({ page }) => {
-    await page.getByTestId("load-example").click();
+    await page.getByTestId("load-example-synthetic").click();
 
     const firstThumb = page.getByTestId("page-thumb-0");
     await expect(firstThumb).toBeVisible({ timeout: 20_000 });
@@ -101,7 +101,7 @@ test.describe("step 2 — render worker", () => {
   test("mupdf.wasm is served from SW cache on offline reload", async ({ page, context }) => {
     await waitForSwActive(page);
     // First render populates the SW runtime-cache with mupdf.wasm
-    await page.getByTestId("load-example").click();
+    await page.getByTestId("load-example-synthetic").click();
     await expect(page.getByTestId("page-thumb-0")).toBeVisible({ timeout: 20_000 });
 
     const cached = await page.evaluate(async () => {

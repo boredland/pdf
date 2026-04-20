@@ -123,6 +123,12 @@ export async function runOcrPipeline(
             sizeBytes: payload.length,
           },
         },
+        // OCR has no visual artifact; reuse the preprocess thumbnail so the
+        // card's ocr-slot shows something while expanding to a text modal.
+        thumbnails: {
+          ...(page.thumbnails ?? {}),
+          ocr: page.thumbnails?.preprocess ?? page.thumbnailDataUrl ?? undefined,
+        },
       });
 
       emitProgress({

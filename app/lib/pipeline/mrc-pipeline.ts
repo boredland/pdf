@@ -173,6 +173,10 @@ export async function runMrcPipeline(
             sizeBytes: totalBytes,
           },
         },
+        thumbnails: {
+          ...(page.thumbnails ?? {}),
+          mrc: result.composedThumbnailDataUrl,
+        },
       });
 
       emitProgress({

@@ -70,7 +70,7 @@ test.describe("step 4 — text-region detection", () => {
   });
 
   test("full pipeline surfaces detect-status=done on every page card", async ({ page }) => {
-    await page.getByTestId("load-example").click();
+    await page.getByTestId("load-example-synthetic").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
       "data-detect-status",
       "done",

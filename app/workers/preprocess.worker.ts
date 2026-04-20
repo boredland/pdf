@@ -241,6 +241,7 @@ export interface DetectInput {
 export interface DetectOutput {
   pageIndex: number;
   regions: TextRegion[];
+  overlayPngBytes: ArrayBuffer;
   overlayDataUrl: string;
   width: number;
   height: number;
@@ -332,15 +333,23 @@ const api = {
       const width = src.cols;
       const height = src.rows;
       const rgba = new Uint8ClampedArray(src.data);
-      const overlayDataUrl = await encodeThumbnail(rgba, width, height);
-
-      return {
-        pageIndex: input.pageIndex,
-        regions,
-        overlayDataUrl,
-        width,
-        height,
-      };
+      const [overlayPng, overlayDataUrl] = await Promise.all([
+        encodePng(rgba, width, height),
+        encodeThumbnail(rgba, width, height),
+      ]);
+      const transferable = new ArrayBuffer(overlayPng.byteLength);
+      new Uint8Array(transferable).set(overlayPng);
+      return Comlink.transfer(
+        {
+          pageIndex: input.pageIndex,
+          regions,
+          overlayPngBytes: transferable,
+          overlayDataUrl,
+          width,
+          height,
+        },
+        [transferable],
+      );
     } finally {
       gray?.delete();
       binary?.delete();

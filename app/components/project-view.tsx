@@ -12,9 +12,10 @@ import { rewindToStage } from "~/lib/pipeline/rewind";
 import { PageDetailPane } from "~/components/page-detail-pane";
 import type { Stage } from "~/lib/storage/db";
 import { progressChannel, type ProgressEvent } from "~/lib/progress";
-import { EXAMPLE_PDF_NAME, loadExamplePdf } from "~/lib/examples";
+import { EXAMPLE_PDFS, loadExamplePdf, type ExampleId } from "~/lib/examples";
 import { SettingsPanel } from "~/components/settings-panel";
 import { ApiKeysPanel } from "~/components/api-keys-panel";
+import { StageStrip } from "~/components/stage-strip";
 
 export function ProjectView() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -78,10 +79,13 @@ export function ProjectView() {
     [ingest],
   );
 
-  const onLoadExample = useCallback(async () => {
-    const bytes = await loadExamplePdf();
-    await ingest(EXAMPLE_PDF_NAME, bytes);
-  }, [ingest]);
+  const onLoadExample = useCallback(
+    async (id: ExampleId) => {
+      const bytes = await loadExamplePdf(id);
+      await ingest(EXAMPLE_PDFS[id].name, bytes);
+    },
+    [ingest],
+  );
 
   const onAbort = useCallback(() => {
     abortRef.current?.abort();
@@ -140,7 +144,7 @@ export function ProjectView() {
         dragging={dragging}
         onDragChange={setDragging}
         onFile={(file) => void onFileDrop(file)}
-        onLoadExample={() => void onLoadExample()}
+        onLoadExample={(id) => void onLoadExample(id)}
         disabled={isBusy}
       />
       <ApiKeysPanel />
@@ -225,7 +229,7 @@ function DropZone(props: {
   dragging: boolean;
   onDragChange: (v: boolean) => void;
   onFile: (f: File) => void;
-  onLoadExample: () => void;
+  onLoadExample: (id: ExampleId) => void;
   disabled: boolean;
 }) {
   const { dragging, onDragChange, onFile, onLoadExample, disabled } = props;
@@ -260,15 +264,28 @@ function DropZone(props: {
         </button>
         .
       </p>
-      <button
-        type="button"
-        data-testid="load-example"
-        disabled={disabled}
-        onClick={onLoadExample}
-        className="rounded-md bg-sky-500/20 px-3 py-1.5 text-sm text-sky-200 hover:bg-sky-500/30 disabled:opacity-60"
-      >
-        Load example PDF
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          data-testid="load-example"
+          disabled={disabled}
+          onClick={() => onLoadExample("scanned")}
+          className="rounded-md bg-sky-500/20 px-3 py-1.5 text-sm text-sky-200 hover:bg-sky-500/30 disabled:opacity-60"
+          title={EXAMPLE_PDFS.scanned.description}
+        >
+          Load scanned example
+        </button>
+        <button
+          type="button"
+          data-testid="load-example-synthetic"
+          disabled={disabled}
+          onClick={() => onLoadExample("synthetic")}
+          className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-60"
+          title={EXAMPLE_PDFS.synthetic.description}
+        >
+          Synthetic fallback
+        </button>
+      </div>
       <input
         ref={inputRef}
         type="file"
@@ -350,6 +367,16 @@ function PageGrid({
                 page {page.index + 1} · {status}
               </p>
             </button>
+            <details className="group mt-1" data-testid={`page-details-${page.index}`}>
+              <summary
+                data-testid={`page-details-summary-${page.index}`}
+                className="cursor-pointer list-none text-[10px] text-slate-500 hover:text-slate-300"
+              >
+                <span className="group-open:hidden">▸ show all stages</span>
+                <span className="hidden group-open:inline">▾ hide stages</span>
+              </summary>
+              <StageStrip page={page} />
+            </details>
           </li>
         );
       })}

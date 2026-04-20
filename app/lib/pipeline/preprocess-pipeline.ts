@@ -123,6 +123,10 @@ export async function runPreprocessPipeline(
           },
         },
         thumbnailDataUrl: result.thumbnailDataUrl,
+        thumbnails: {
+          ...(page.thumbnails ?? {}),
+          preprocess: result.thumbnailDataUrl,
+        },
       });
 
       emitProgress({

@@ -24,6 +24,8 @@ export interface PageStageStatus {
   completedAt: number;
   artifactPath: string;
   sizeBytes?: number;
+  /** secondary image artifact path (e.g. detect-overlay.png) */
+  overlayPath?: string;
 }
 
 export interface Page {
@@ -32,6 +34,8 @@ export interface Page {
   index: number;
   status: Partial<Record<Stage, PageStageStatus>>;
   thumbnailDataUrl?: string;
+  /** per-stage thumbnails (data URLs), populated as each stage completes */
+  thumbnails?: Partial<Record<Stage, string>>;
 }
 
 export interface Job {

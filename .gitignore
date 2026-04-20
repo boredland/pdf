@@ -1,6 +1,7 @@
 node_modules
 dist
 public/tesseract/
+public/examples/scanned.pdf
 .output
 .vinxi
 .nitro

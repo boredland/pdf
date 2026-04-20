@@ -123,6 +123,10 @@ export async function runRenderPipeline(
           },
         },
         thumbnailDataUrl: result.thumbnailDataUrl,
+        thumbnails: {
+          ...(row?.thumbnails ?? {}),
+          render: result.thumbnailDataUrl,
+        },
       });
       emitProgress({
         kind: "stage",

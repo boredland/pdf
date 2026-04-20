@@ -96,7 +96,14 @@ export async function runDetectPipeline(
         return;
       }
 
-      if (existing) await removeFile(existing.artifactPath).catch(() => undefined);
+      if (existing) {
+        await Promise.all([
+          removeFile(existing.artifactPath).catch(() => undefined),
+          existing.overlayPath
+            ? removeFile(existing.overlayPath).catch(() => undefined)
+            : Promise.resolve(),
+        ]);
+      }
       const path = artifactPath({
         projectId: project.id,
         pageIndex,
@@ -104,12 +111,17 @@ export async function runDetectPipeline(
         hash,
         extension: "json",
       });
+      const overlayPath = `${project.id}/pages/${pageIndex}/detect-overlay.${hash}.png`;
       const payload = JSON.stringify({
         regions: result.regions,
         width: result.width,
         height: result.height,
+        overlayPath,
       });
-      await writeFile(path, new TextEncoder().encode(payload));
+      await Promise.all([
+        writeFile(path, new TextEncoder().encode(payload)),
+        writeFile(overlayPath, new Uint8Array(result.overlayPngBytes)),
+      ]);
 
       await db.pages.update(`${project.id}:${pageIndex}`, {
         status: {
@@ -118,10 +130,15 @@ export async function runDetectPipeline(
             hash,
             completedAt: Date.now(),
             artifactPath: path,
-            sizeBytes: payload.length,
+            overlayPath,
+            sizeBytes: payload.length + result.overlayPngBytes.byteLength,
           },
         },
         thumbnailDataUrl: result.overlayDataUrl,
+        thumbnails: {
+          ...(page.thumbnails ?? {}),
+          detect: result.overlayDataUrl,
+        },
       });
 
       emitProgress({

@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "postinstall": "bun run scripts/fetch-tesseract-assets.ts"
+    "postinstall": "bun run scripts/fetch-assets.ts"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.95.0",

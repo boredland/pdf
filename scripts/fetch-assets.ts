@@ -20,6 +20,15 @@ const TRAINEDDATA_URL =
   "https://cdn.jsdelivr.net/gh/naptha/tessdata@gh-pages/4.0.0_fast/eng.traineddata.gz";
 const TRAINEDDATA_OUT = `${OUT}/eng.traineddata`;
 
+// Real scanned fixture: OCRmyPDF's deliberately-skewed test PDF (MPL-2.0).
+// Pinned by commit so the file never drifts under us.
+const EXAMPLES_DIR = "public/examples";
+const SCANNED_EXAMPLE = {
+  url: "https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/v16.11.0/tests/resources/skew.pdf",
+  out: `${EXAMPLES_DIR}/scanned.pdf`,
+  minBytes: 50_000,
+};
+
 const CORE_FILES = [
   "tesseract-core.wasm",
   "tesseract-core.wasm.js",
@@ -68,6 +77,21 @@ async function downloadTraineddata() {
   console.log(`wrote ${TRAINEDDATA_OUT}`);
 }
 
+async function downloadScannedExample() {
+  if (await fileHasSize(SCANNED_EXAMPLE.out, SCANNED_EXAMPLE.minBytes)) return;
+  await mkdir(EXAMPLES_DIR, { recursive: true });
+  console.log(`downloading ${SCANNED_EXAMPLE.url}`);
+  const res = await fetch(SCANNED_EXAMPLE.url);
+  if (!res.ok || !res.body) {
+    throw new Error(`fetch failed ${res.status} ${res.statusText}`);
+  }
+  await pipeline(
+    Readable.fromWeb(res.body as never),
+    createWriteStream(SCANNED_EXAMPLE.out),
+  );
+  console.log(`wrote ${SCANNED_EXAMPLE.out}`);
+}
+
 async function main() {
   await mkdir(OUT, { recursive: true });
 
@@ -91,6 +115,15 @@ async function main() {
     console.warn(
       `failed to download eng.traineddata: ${(err as Error).message}.\n` +
         "OCR will still work — tesseract.js will fall back to jsdelivr on first use.",
+    );
+  }
+
+  try {
+    await downloadScannedExample();
+  } catch (err) {
+    console.warn(
+      `failed to download scanned example: ${(err as Error).message}.\n` +
+        "Synthetic fallback will still be available.",
     );
   }
 }

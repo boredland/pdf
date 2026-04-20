@@ -210,7 +210,7 @@ test.describe("step 6 — Gemini provider", () => {
   test("UI: api-keys panel flips unlocked state after passphrase + key save", async ({
     page,
   }) => {
-    await page.getByTestId("load-example").click();
+    await page.getByTestId("load-example-synthetic").click();
     const panel = page.getByTestId("api-keys-panel");
     await expect(panel).toBeVisible();
     await page.getByTestId("api-keys-passphrase").fill("hunter2");
