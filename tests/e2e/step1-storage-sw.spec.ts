@@ -156,6 +156,32 @@ test.describe("step 1 — storage, artifact model, service worker", () => {
     await context.setOffline(false);
   });
 
+  test("assets pill: per-bucket rows + online indicator + online→offline toggle", async ({
+    page,
+    context,
+  }) => {
+    await waitForSwActive(page);
+    const pill = page.getByTestId("assets-pill");
+    await expect(pill).toBeVisible();
+    await expect(pill).toHaveAttribute("data-online", "true");
+
+    await pill.click();
+    await expect(page.getByTestId("assets-pane")).toBeVisible();
+    await expect(page.getByTestId("assets-online-label")).toHaveText("online");
+
+    // At least one bucket row should render once the SW populates its
+    // caches (workbox-precache-* at minimum).
+    await expect
+      .poll(async () => page.getByTestId("assets-cache-names").locator("li").count())
+      .toBeGreaterThan(0);
+
+    // Flip to offline and assert the pill flags it without a reload.
+    await context.setOffline(true);
+    await expect(pill).toHaveAttribute("data-online", "false", { timeout: 5_000 });
+    await expect(page.getByTestId("assets-online-label")).toHaveText("offline");
+    await context.setOffline(false);
+  });
+
   test("assets pill opens, shows cache entries, purge clears them", async ({ page }) => {
     await waitForSwActive(page);
     const pill = page.getByTestId("assets-pill");

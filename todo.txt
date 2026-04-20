@@ -25,7 +25,8 @@
 - [ ] Visual regression screenshots: empty / ingest / mid-job / done / error
 - [x] Cold-load → example job → reload offline → reopen → re-run page →
       export (step13 e2e spec)                              (shipped)
-- [ ] Asset-cache pane polish (sizes, purge per-asset, online/offline state)
+- [x] Asset-cache pane polish: per-bucket rows with entry counts,
+      per-bucket purge, online/offline pill indicator.        (shipped)
 - [ ] Error-state surfaces across panels (provider failure, OPFS full, etc.)
 - [x] Display original vs. built PDF size (and the delta) on the project
       header so users see the MRC compression payoff (or penalty).
@@ -42,9 +43,9 @@
       MRC. Validated end-to-end on cardinal.pdf's 4-page fixture.
 - [ ] Raise OSD confidence threshold (currently 2.0) after measuring on a
       real scan corpus — lower FP rate on ambiguous pages.
-- [ ] Route osd.traineddata/eng.traineddata through the existing SW
-      traineddata CacheFirst runtime cache via Workbox rule — currently
-      only gets the precache globPatterns hit for bundled assets.
+- [x] Verified osd/eng traineddata already match the SW runtime
+      CacheFirst rule (`/\.traineddata(\.gz)?$/i`). Lazy-cached on
+      first fetch, offline thereafter — matches the delivery plan.
 - [ ] Provide a manual "rotate page" control in the detail pane (and
       probably as a quick action on the page card too) as an escape
       hatch when OSD gets it wrong. Needs: per-page rotation override
