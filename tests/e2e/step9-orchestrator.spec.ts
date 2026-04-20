@@ -195,11 +195,16 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
   }) => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
-    await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-      "data-mrc-status",
-      "done",
-      { timeout: 180_000 },
-    );
+    // Wait for all 3 pages' MRC to finish so the byte count stabilises
+    // before we snapshot — otherwise we can race a mid-write and measure
+    // a prefix state that'll grow after the reload.
+    for (const i of [0, 1, 2]) {
+      await expect(page.getByTestId(`page-card-${i}`)).toHaveAttribute(
+        "data-mrc-status",
+        "done",
+        { timeout: 180_000 },
+      );
+    }
 
     const beforeBytes = await page.evaluate(async () => {
       const id = (await window.__pdfApp!.projects.listProjects())[0]!.id;

@@ -112,14 +112,16 @@
 - [ ] Multi-provider readiness (Mistral OCR, Doubleword, Gemma) behind registry
 
 ## Known-broken / untested corners surfaced during the speedup pass
-- [ ] Tests that still run real Tesseract (step5, step6, step7-6, step8
-      invisible-text) pull eng.traineddata from jsDelivr on first run — brittle
-      in CI without a warm SW cache. Consider pre-seeding via a global setup.
+- [x] Verified: eng is in LOCAL_PREBUILT_LANGS so langPathFor routes
+      it to our in-repo traineddata. No CI brittleness from jsDelivr
+      on the default test path.                              (verified)
 - [x] Mock OCR provider no longer registered in the default registry.
       The harness registers it lazily when tests call
       `testing.setDefaultOcrProvider("mock")`.             (shipped)
-- [ ] No e2e coverage for: dropping a real PDF via the drop zone (we go
-      through the harness), abort during build, OPFS quota exhaustion.
+- [x] E2E coverage added: file-input drop (step19), aborted-signal
+      build short-circuit (step19), OPFS graceful-absence read
+      (step19). Full quota-exhaustion still needs a Chromium flag.
+                                                              (shipped)
 - [ ] `optimize-mask` threshold is hard-coded at 128 — no exposure in
       settings, no visual regression. Fine today, flag if it starts
       clipping antialiased masks.
