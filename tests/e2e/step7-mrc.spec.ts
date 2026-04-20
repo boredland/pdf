@@ -103,8 +103,9 @@ test.describe("step 7 — MRC split + compression", () => {
       const preBefore = window.__pdfPreprocessCallCount ?? 0;
       const mrcBefore = window.__pdfMrcCallCount ?? 0;
 
+      // Flip to a preset other than the default so MRC actually re-runs.
       await app.db.projects.update(id, {
-        settings: { ...project.settings, mrc: { preset: "compact" } },
+        settings: { ...project.settings, mrc: { preset: "lossless" } },
       });
       const fresh = (await app.projects.getProject(id))!;
       await app.render.runRenderPipeline(fresh, { pageIndices: [0] });

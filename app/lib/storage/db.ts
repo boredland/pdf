@@ -116,5 +116,5 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   },
   detect: { enabled: true },
   ocr: { providerId: "tesseract", language: "eng" },
-  mrc: { preset: "archival" },
+  mrc: { preset: "compact" },
 };
