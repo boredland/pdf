@@ -15,6 +15,14 @@ import { measureSkew } from "~/lib/workers/preprocess-client";
 import { runDetectPipeline, readDetectRegions } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline, readOcrResult } from "~/lib/pipeline/ocr-pipeline";
 import { listProviders } from "~/lib/providers/registry";
+import {
+  clearSessionPassphrase,
+  forgetApiKey,
+  hasApiKey,
+  hasSessionPassphrase,
+  setSessionPassphrase,
+  storeApiKey,
+} from "~/lib/api-keys";
 import { rewindToStage } from "~/lib/pipeline/rewind";
 import { EXAMPLE_PDF_URL, loadExamplePdf } from "~/lib/examples";
 
@@ -58,6 +66,14 @@ declare global {
         readOcrResult: typeof readOcrResult;
         listProviders: typeof listProviders;
       };
+      apiKeys: {
+        has: typeof hasApiKey;
+        store: typeof storeApiKey;
+        forget: typeof forgetApiKey;
+        setPassphrase: typeof setSessionPassphrase;
+        clearPassphrase: typeof clearSessionPassphrase;
+        hasPassphrase: typeof hasSessionPassphrase;
+      };
       rewind: { toStage: typeof rewindToStage };
       example: {
         url: string;
@@ -85,6 +101,14 @@ export function installTestHarness(): void {
     preprocess: { runPreprocessPipeline, measureSkew },
     detect: { runDetectPipeline, readDetectRegions },
     ocr: { runOcrPipeline, readOcrResult, listProviders },
+    apiKeys: {
+      has: hasApiKey,
+      store: storeApiKey,
+      forget: forgetApiKey,
+      setPassphrase: setSessionPassphrase,
+      clearPassphrase: clearSessionPassphrase,
+      hasPassphrase: hasSessionPassphrase,
+    },
     rewind: { toStage: rewindToStage },
     example: { url: EXAMPLE_PDF_URL, load: loadExamplePdf },
   };

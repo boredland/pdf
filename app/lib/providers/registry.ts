@@ -1,7 +1,8 @@
 import type { OcrProvider } from "./types";
 import { tesseractProvider } from "./tesseract";
+import { geminiProvider } from "./gemini";
 
-const PROVIDERS: OcrProvider[] = [tesseractProvider];
+const PROVIDERS: OcrProvider[] = [tesseractProvider, geminiProvider];
 
 export function listProviders(): OcrProvider[] {
   return [...PROVIDERS];

@@ -1,5 +1,6 @@
 import type { Project } from "~/lib/storage/db";
 import { getDb } from "~/lib/storage/db";
+import { listProviders } from "~/lib/providers/registry";
 
 export function SettingsPanel({
   project,
@@ -19,6 +20,14 @@ export function SettingsPanel({
       },
     });
   }
+
+  async function updateOcrProvider(id: string) {
+    await getDb().projects.update(project.id, {
+      settings: { ...project.settings, ocr: { ...project.settings.ocr, providerId: id } },
+    });
+  }
+
+  const providers = listProviders();
 
   return (
     <form
@@ -68,6 +77,22 @@ export function SettingsPanel({
         <span className="tabular-nums text-xs text-slate-400">
           {project.settings.preprocess.denoiseRadius}
         </span>
+      </label>
+      <label className="flex items-center gap-2 sm:col-span-3">
+        <span className="shrink-0">OCR provider</span>
+        <select
+          data-testid="settings-ocr-provider"
+          className="min-w-0 rounded border border-slate-700 bg-slate-800 px-2 py-1"
+          value={project.settings.ocr.providerId}
+          disabled={disabled}
+          onChange={(e) => void updateOcrProvider(e.target.value)}
+        >
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
       </label>
     </form>
   );

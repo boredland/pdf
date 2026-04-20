@@ -10,6 +10,7 @@ import { rewindToStage } from "~/lib/pipeline/rewind";
 import { progressChannel, type ProgressEvent } from "~/lib/progress";
 import { EXAMPLE_PDF_NAME, loadExamplePdf } from "~/lib/examples";
 import { SettingsPanel } from "~/components/settings-panel";
+import { ApiKeysPanel } from "~/components/api-keys-panel";
 
 export function ProjectView() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -106,6 +107,7 @@ export function ProjectView() {
         onLoadExample={() => void onLoadExample()}
         disabled={isBusy}
       />
+      <ApiKeysPanel />
       {error && (
         <p className="text-sm text-red-400" data-testid="project-error">
           {error}
