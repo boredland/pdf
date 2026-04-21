@@ -45,6 +45,7 @@ import {
   storeApiKey,
 } from "~/lib/api-keys";
 import { rewindToStage, setPageRotationOverride } from "~/lib/pipeline/rewind";
+import { encodeJbig2 } from "~/lib/compression/jbig2";
 import {
   exportProjectAlto,
   exportProjectHocr,
@@ -111,6 +112,7 @@ declare global {
       };
       exportHocr: typeof exportProjectHocr;
       exportAlto: typeof exportProjectAlto;
+      encodeJbig2: typeof encodeJbig2;
       progress: {
         compute: typeof computeProgress;
         predict: typeof predictInvalidation;
@@ -219,6 +221,7 @@ export function installTestHarness(): void {
     build: { runBuildPipeline, readBuildOutput },
     exportHocr: exportProjectHocr,
     exportAlto: exportProjectAlto,
+    encodeJbig2,
     progress: {
       compute: computeProgress,
       predict: predictInvalidation,

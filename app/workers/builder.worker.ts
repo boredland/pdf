@@ -11,6 +11,7 @@ import {
   setFillingGrayscaleColor,
   translate,
 } from "pdf-lib";
+import { encodeJbig2 } from "~/lib/compression/jbig2";
 import { encodeCcittG4 } from "~/lib/compression/ccitt-g4";
 import type { OcrResult, OcrWord } from "~/lib/providers/types";
 
@@ -36,6 +37,8 @@ export interface BuilderInput {
 
 export interface BuilderOutput {
   pdfBytes: ArrayBuffer;
+  /** `true` if the JBIG2 WASM encoder was used for masks (vs CCITT G4 fallback). */
+  usedJbig2?: boolean;
 }
 
 const api = {
@@ -46,6 +49,7 @@ const api = {
     doc.setProducer("pdf-lib + tesseract.js");
 
     const font = await doc.embedFont(StandardFonts.Helvetica);
+    let usedJbig2Global = false;
 
     for (const pageInput of input.pages) {
       const { pageWidthPt: pageW, pageHeightPt: pageH } = pageInput;
@@ -64,13 +68,14 @@ const api = {
       // MRC split flagged this upstream and the bg alone is a faithful
       // representation. Saves the per-page mask bytes.
       if (!pageInput.skipMask) {
-        await drawMaskAsImageMask(
+        const didJbig2 = await drawMaskAsImageMask(
           doc,
           page,
           new Uint8Array(pageInput.maskPngBytes),
           pageW,
           pageH,
         );
+        if (didJbig2) usedJbig2Global = true;
       }
 
       // Overlay invisible OCR words. opacity:0 renders the text into the
@@ -86,22 +91,26 @@ const api = {
     const bytes = await doc.save();
     const transferable = new ArrayBuffer(bytes.byteLength);
     new Uint8Array(transferable).set(bytes);
-    return Comlink.transfer({ pdfBytes: transferable }, [transferable]);
+    return Comlink.transfer(
+      { pdfBytes: transferable, usedJbig2: usedJbig2Global },
+      [transferable],
+    );
   },
 };
 
 /**
- * Draw a bitonal mask onto a page as a PDF native /ImageMask XObject
- * encoded with CCITT Group 4 (T.6) fax compression.
+ * Draw a bitonal mask onto a page as a PDF /ImageMask XObject.
  *
- * On text-heavy pages T.6 typically emits ~5-10× smaller streams than
- * flate-compressed 1-bit data. The filter is a PDF standard
- * (`/CCITTFaxDecode` with `/K -1`) so every viewer can open it.
+ * Primary path: JBIG2 generic-region encoding (85 KB vendored WASM,
+ * ~2-5× tighter than CCITT G4 on text-heavy pages).
+ * Fallback: CCITT Group 4 (pure JS) if the WASM fails to load.
  *
- * PDF convention: in CCITT output, 0 is white and 1 is black. ImageMask
- * semantics are 0 = paint with current fill, 1 = transparent — i.e.
- * painted text pixels should be 0 in our CCITT bits. We therefore
- * invert the luminance comparison before packing.
+ * PDF convention: in the decoded output, 0 = paint with current fill,
+ * 1 = transparent. For JBIG2, 0 = white / 1 = black in standard
+ * convention, which inverts the ImageMask sense. We therefore set
+ * /Decode [1 0] in the XObject dict to flip the interpretation so
+ * text pixels (JBIG2 black = 1) paint and background (white = 0) is
+ * transparent.
  */
 async function drawMaskAsImageMask(
   doc: PDFDocument,
@@ -109,7 +118,7 @@ async function drawMaskAsImageMask(
   maskPng: Uint8Array,
   pageWidthPt: number,
   pageHeightPt: number,
-) {
+): Promise<boolean> {
   const blob = new Blob([maskPng.slice().buffer], { type: "image/png" });
   const bitmap = await createImageBitmap(blob);
   const widthPx = bitmap.width;
@@ -122,39 +131,78 @@ async function drawMaskAsImageMask(
   bitmap.close?.();
   const { data } = ctx.getImageData(0, 0, widthPx, heightPx);
 
-  // CCITT convention: 1 byte per pixel, 0=white (bg), 1=black (text).
-  // In ImageMask semantics: 0 = paint, 1 = transparent. Text pixels
-  // (those that should be painted black) therefore need to emerge as 0
-  // from the CCITT decoder, so we set them to 0 in the input too.
-  const pixels = new Uint8Array(widthPx * heightPx);
-  for (let i = 0, j = 0; j < pixels.length; i += 4, j++) {
-    pixels[j] = (data[i] ?? 0) < 128 ? 1 : 0;
+  // Pack into MSB-first 1-bit-per-pixel: 1 = black (text), 0 = white (bg).
+  const bytesPerRow = Math.ceil(widthPx / 8);
+  const packed = new Uint8Array(bytesPerRow * heightPx);
+  for (let y = 0; y < heightPx; y++) {
+    const rowOffset = y * bytesPerRow;
+    for (let x = 0; x < widthPx; x++) {
+      const lum = data[(y * widthPx + x) * 4]!;
+      if (lum < 128) {
+        // text pixel → bit = 1
+        packed[rowOffset + (x >> 3)]! |= 1 << (7 - (x & 7));
+      }
+    }
   }
 
-  const encoded = encodeCcittG4({ pixels, width: widthPx, height: heightPx });
+  // Try JBIG2 first; fall back to CCITT G4 if the WASM can't load.
+  let encoded: Uint8Array;
+  let useJbig2 = false;
+  try {
+    encoded = await encodeJbig2(packed, widthPx, heightPx);
+    useJbig2 = true;
+  } catch {
+    // JBIG2 WASM failed — fall back to CCITT G4 (pure JS, always works).
+    // CCITT convention: 0=white, 1=black — same bit layout as our packed.
+    // But for ImageMask: 0=paint, 1=transparent. So we need inverted bits.
+    const ccittPixels = new Uint8Array(widthPx * heightPx);
+    for (let i = 0, j = 0; j < ccittPixels.length; i += 4, j++) {
+      ccittPixels[j] = (data[i] ?? 0) < 128 ? 1 : 0;
+    }
+    encoded = encodeCcittG4({
+      pixels: ccittPixels,
+      width: widthPx,
+      height: heightPx,
+    });
+  }
 
-  // DecodeParms for CCITTFaxDecode: K=-1 (Group 4), Columns=width,
-  // Rows=height, EndOfBlock=true (we emit the EOFB marker).
-  const decodeParms = doc.context.obj({
-    K: -1,
-    Columns: widthPx,
-    Rows: heightPx,
-    EndOfBlock: true,
-  });
-  const dict = doc.context.obj({
-    Type: "XObject",
-    Subtype: "Image",
-    Width: widthPx,
-    Height: heightPx,
-    BitsPerComponent: 1,
-    ImageMask: true,
-    Filter: "CCITTFaxDecode",
-    DecodeParms: decodeParms,
-    Length: encoded.byteLength,
-  });
+  let dict;
+  if (useJbig2) {
+    dict = doc.context.obj({
+      Type: "XObject",
+      Subtype: "Image",
+      Width: widthPx,
+      Height: heightPx,
+      BitsPerComponent: 1,
+      ImageMask: true,
+      Filter: "JBIG2Decode",
+      // /Decode [1 0] flips the bit interpretation: JBIG2's 1 (black)
+      // becomes "paint" in ImageMask, and 0 (white) becomes transparent.
+      Decode: [1, 0],
+      Length: encoded.byteLength,
+    });
+  } else {
+    const decodeParms = doc.context.obj({
+      K: -1,
+      Columns: widthPx,
+      Rows: heightPx,
+      EndOfBlock: true,
+    });
+    dict = doc.context.obj({
+      Type: "XObject",
+      Subtype: "Image",
+      Width: widthPx,
+      Height: heightPx,
+      BitsPerComponent: 1,
+      ImageMask: true,
+      Filter: "CCITTFaxDecode",
+      DecodeParms: decodeParms,
+      Length: encoded.byteLength,
+    });
+  }
+
   const stream = PDFRawStream.of(dict, encoded);
   const ref = doc.context.register(stream);
-
   const name = page.node.newXObject("Mask", ref);
 
   page.pushOperators(
@@ -165,6 +213,7 @@ async function drawMaskAsImageMask(
     drawObject(name),
     popGraphicsState(),
   );
+  return useJbig2;
 }
 
 

@@ -1,0 +1,38 @@
+/**
+ * JBIG2 encoder wrapper around the vendored jbig2enc-rust WASM build.
+ *
+ * Generic-region JBIG2 compresses bitonal text pages ~2-5× tighter than
+ * CCITT G4. The 85 KB WASM binary is loaded once per worker lifetime.
+ *
+ * PDF uses `/Filter /JBIG2Decode` for the stream. Unlike CCITT, JBIG2
+ * is a "self-decoding" format — the segment headers carry width/height/
+ * flags internally, so the PDF XObject dict doesn't need DecodeParms.
+ */
+
+import initWasm, { encode_jbig2_generic } from "./jbig2-wasm/jbig2_wasm.js";
+
+let ready: Promise<void> | null = null;
+
+async function ensureInit(): Promise<void> {
+  if (!ready) {
+    // Use new URL(... import.meta.url) so both the main thread AND web
+    // workers resolve the path relative to this chunk, not the HTML root.
+    const url = new URL("./jbig2-wasm/jbig2_wasm_bg.wasm", import.meta.url);
+    ready = initWasm(url).then(() => undefined);
+  }
+  return ready;
+}
+
+/**
+ * Encode a bitonal image as a JBIG2 generic-region segment. The input is
+ * 1 bit per pixel packed MSB-first, padded to byte boundaries per row
+ * (same layout the builder already produces for the CCITT path).
+ */
+export async function encodeJbig2(
+  packedBits: Uint8Array,
+  widthPx: number,
+  heightPx: number,
+): Promise<Uint8Array> {
+  await ensureInit();
+  return encode_jbig2_generic(packedBits, widthPx, heightPx);
+}

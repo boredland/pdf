@@ -82,17 +82,15 @@
 - [x] Builder: embed mask + background separately (was: lossless PNG of
       the composed image, ~18× source size) → ~7-8× after mask+bg split
       and 0.75-scale mask. Further drops blocked on JBIG2.  (shipped)
-- [x] CCITT Group 4 (T.6) mask encoding as the JBIG2 substitute. Pure
-      JS, PDF-native filter. On skew.pdf: total output 151 KB → 139 KB
-      (8% smaller) and the mask contribution alone drops ~25% vs the
-      prior flate /ImageMask path. The often-cited "5-10× win" for G4
-      is relative to *uncompressed* 1-bit data — vs already-flate-
-      compressed 1-bit the real-world improvement is the more modest
-      25-35% we see. True JBIG2 would win another 1.5-2× (symbol
-      coding for repeated glyphs), but no usable WASM build is on npm
-      right now — agl/jbig2enc compiles but every emscripten fork we
-      found either has broken encoder bindings or never exposed them.
-      Revisit when one stabilises.                          (shipped)
+- [x] JBIG2 generic-region mask encoding via vendored jbig2enc-rust
+      WASM (85 KB). Compiled from LegeApp/jbig2enc-rust with a thin
+      wasm-bindgen shim. On skew.pdf: 76 KB → 125 KB (1.65×) — down
+      from 139 KB with CCITT G4 (1.83×) and 151 KB with flate (2.0×).
+      CCITT G4 (pure JS) remains as the silent fallback if the WASM
+      fails to load. Symbol-coded JBIG2 (1.5-2× further win on pages
+      with repeated glyphs) requires the `symboldict` feature in
+      jbig2enc-rust, which needs `cc-analysis` — track separately.
+                                                              (shipped)
 - [ ] JPEG 2000 for the background. Attempted with
       @cornerstonejs/codec-openjpeg; the J2KEncoder's parameter
       bindings are broken (setCompressionRatio/setQuality have no
