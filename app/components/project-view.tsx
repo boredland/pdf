@@ -8,6 +8,7 @@ import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
 import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
 import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
+import { exportProjectHocr } from "~/lib/export/export-hocr";
 import { PIPELINE_ORDER, runStage } from "~/lib/pipeline/run-stage";
 import { rewindToStage } from "~/lib/pipeline/rewind";
 import { PageDetailPane } from "~/components/page-detail-pane";
@@ -137,15 +138,17 @@ export function ProjectView() {
     if (!project?.build) return;
     const blob = await readBuildOutput(project.id);
     if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const safeName = project.name.replace(/[^\w.-]+/g, "_");
-    a.download = `${safeName || "output"}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    triggerDownload(blob, `${safeFileName(project.name)}.pdf`);
+  }, [project]);
+
+  const onDownloadHocr = useCallback(async () => {
+    if (!project) return;
+    const blob = await exportProjectHocr(project);
+    if (!blob) {
+      setError("No OCR results to export — run OCR first.");
+      return;
+    }
+    triggerDownload(blob, `${safeFileName(project.name)}.hocr.html`);
   }, [project]);
 
   const pageList = pages ?? [];
@@ -217,6 +220,17 @@ export function ProjectView() {
                       Download PDF
                     </button>
                   )}
+                  {pageList.some((p) => p.status.ocr) && (
+                    <button
+                      type="button"
+                      onClick={() => void onDownloadHocr()}
+                      data-testid="download-hocr"
+                      className="rounded-md border border-emerald-500/40 px-3 py-1.5 text-sm font-medium text-emerald-200 hover:bg-emerald-500/10"
+                      title="Structured OCR output (hOCR / XHTML)"
+                    >
+                      Download hOCR
+                    </button>
+                  )}
                 </>
               )}
               {isBusy && (
@@ -261,6 +275,21 @@ export function ProjectView() {
       )}
     </div>
   );
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^\w.-]+/g, "_") || "output";
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function SizeDelta({ project }: { project: Project }) {

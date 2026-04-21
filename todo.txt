@@ -108,8 +108,11 @@
       non-image streams — mupdf support TBD.
 
 ## Deferred follow-ups (from memory)
-- [ ] pino-style structured browser logging (replace ad-hoc console.warn)
-- [ ] Multi-provider readiness (Mistral OCR, Doubleword, Gemma) behind registry
+- [x] pino-style structured browser logging: app/lib/logger.ts with
+      level/time/evt JSON output and .child() bindings. Converted OSD
+      + example-pdf fallback off ad-hoc console.warn.         (shipped)
+- [~] Multi-provider readiness: Tesseract + Gemini + Mistral shipped
+      behind the registry. Doubleword/Gemma pending documented APIs.
 
 ## Known-broken / untested corners surfaced during the speedup pass
 - [x] Verified: eng is in LOCAL_PREBUILT_LANGS so langPathFor routes
@@ -131,4 +134,9 @@
 - [ ] Optional CORS proxy worker for blocked providers
 - [ ] Dewarping (book-spine curvature)
 - [ ] Batch import (ZIP / multi-PDF)
-- [ ] Export hOCR / ALTO XML
+- [x] Export hOCR (XHTML). "Download hOCR" button appears once any
+      page has OCR; prefers Tesseract's native hocr, synthesises
+      per-word bboxes for hosted providers. Output is a single
+      .hocr.html doc covering all pages.                     (shipped)
+- [ ] ALTO XML export (separate format, some downstream consumers
+      prefer it over hOCR).
