@@ -50,6 +50,25 @@ async function enableGemini(page: Page, projectId: string) {
   }, projectId);
 }
 
+async function bootstrapWithDetect(page: Page, projectName: string) {
+  return page.evaluate(async (name) => {
+    const app = window.__pdfApp!;
+    const bytes = await app.example.load();
+    const project = await app.projects.createProjectFromBytes(name, bytes);
+    await app.render.ensurePageRows(project);
+    await app.render.runRenderPipeline(
+      (await app.projects.getProject(project.id))!,
+    );
+    await app.preprocess.runPreprocessPipeline(
+      (await app.projects.getProject(project.id))!,
+    );
+    await app.detect.runDetectPipeline(
+      (await app.projects.getProject(project.id))!,
+    );
+    return project.id;
+  }, projectName);
+}
+
 test.describe("step 6 — Gemini provider", () => {
   test.setTimeout(120_000);
   test.beforeEach(async ({ page }) => {
@@ -220,5 +239,34 @@ test.describe("step 6 — Gemini provider", () => {
     await page.getByTestId("api-keys-save").click();
     await expect(page.getByTestId("api-keys-unlocked")).toBeVisible();
     await expect(page.getByText("gemini-flash")).toBeVisible();
+  });
+
+  test("hosted OCR crops one call per detected region and returns bboxes inside those regions", async ({
+    page,
+  }) => {
+    await mockGemini(page, "region-local-text");
+    const projectId = await bootstrapWithDetect(page, "per-region");
+    await enableGemini(page, projectId);
+
+    const outcome = await page.evaluate(async (id) => {
+      const app = window.__pdfApp!;
+      const project = (await app.projects.getProject(id))!;
+      await app.ocr.runOcrPipeline(project, { pageIndices: [0] });
+      const ocr = await app.ocr.readOcrResult(id, 0);
+      const detect = await app.detect.readDetectRegions(id, 0);
+      return {
+        ocrLineCount: ocr?.lines.length ?? 0,
+        regionCount: detect?.regions.length ?? 0,
+        firstLineBbox: ocr?.lines[0]?.bbox,
+        firstRegion: detect?.regions[0],
+      };
+    }, projectId);
+
+    // One hOCR line per MSER region.
+    expect(outcome.ocrLineCount).toBe(outcome.regionCount);
+    // First line's bbox is anchored at the first region's pixel offset,
+    // not at (0, 0) like the old synthetic path produced.
+    expect(outcome.firstLineBbox?.x).toBe(outcome.firstRegion?.x);
+    expect(outcome.firstLineBbox?.y).toBe(outcome.firstRegion?.y);
   });
 });

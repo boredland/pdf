@@ -141,3 +141,9 @@
 - [x] ALTO 4.1 XML export alongside hOCR. Same export/ module,
       shared page-collection helper; Download ALTO button + spec.
                                                               (shipped)
+- [x] Hosted-provider bbox fidelity: OCR pipeline now crops each
+      MSER region and dispatches one provider call per region. Each
+      region's pixel rectangle is used as the resulting line's bbox,
+      so hOCR/ALTO exports from Gemini/Mistral carry real coordinates
+      instead of evenly-spaced placeholders. Falls back to full-page
+      dispatch when detect artifacts aren't available.       (shipped)

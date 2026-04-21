@@ -1,6 +1,8 @@
 import { artifactPath, settingsHash } from "~/lib/artifacts";
 import { emitProgress } from "~/lib/progress";
 import { getProvider } from "~/lib/providers/registry";
+import type { OcrResult } from "~/lib/providers/types";
+import { readDetectRegions } from "~/lib/pipeline/detect-pipeline";
 import { getDb, type Project } from "~/lib/storage/db";
 import { readBlob, removeFile, writeFile } from "~/lib/storage/opfs";
 
@@ -82,12 +84,32 @@ export async function runOcrPipeline(
       const preBlob = await readBlob(page.status.preprocess.artifactPath);
       if (!preBlob) throw new Error("preprocess artifact missing");
       const pngBytes = await preBlob.arrayBuffer();
-      const result = await provider.recognize({
-        pngBytes,
-        pageIndex,
-        language: project.settings.ocr.language,
-        signal: options.signal,
-      });
+
+      // Hosted providers (Gemini, Mistral, ...) return flat text without
+      // per-word bboxes. If the detect stage found MSER regions we can
+      // crop to each and recall the provider per-region, turning each
+      // region's pixel bbox into the resulting text's coordinates — so
+      // hOCR/ALTO exports from hosted OCR line up with the source page.
+      // Tesseract already emits real word bboxes on the full page, so we
+      // skip the crop loop for it.
+      let result: OcrResult;
+      if (provider.kind === "hosted") {
+        result = await runHostedOcrPerRegion({
+          provider,
+          projectId: project.id,
+          pageIndex,
+          language: project.settings.ocr.language,
+          pngBytes,
+          signal: options.signal,
+        });
+      } else {
+        result = await provider.recognize({
+          pngBytes,
+          pageIndex,
+          language: project.settings.ocr.language,
+          signal: options.signal,
+        });
+      }
 
       if (isAborted(options.signal)) {
         emitProgress({
@@ -154,6 +176,102 @@ export async function runOcrPipeline(
       throw err;
     }
   }
+}
+
+interface HostedOcrArgs {
+  provider: import("~/lib/providers/types").OcrProvider;
+  projectId: string;
+  pageIndex: number;
+  language: string;
+  pngBytes: ArrayBuffer;
+  signal?: AbortSignal;
+}
+
+/**
+ * For hosted OCR providers (Gemini, Mistral), crop the preprocessed page
+ * into the MSER-detected regions and dispatch one provider call per
+ * region. Each region's pixel rectangle becomes the line bbox, so the
+ * exported hOCR/ALTO is pixel-accurate instead of carrying evenly-
+ * stepped placeholder rectangles. Falls back to a single full-page call
+ * when detect artifacts aren't available.
+ */
+async function runHostedOcrPerRegion(args: HostedOcrArgs): Promise<OcrResult> {
+  const {
+    provider,
+    projectId,
+    pageIndex,
+    language,
+    pngBytes,
+    signal,
+  } = args;
+
+  const detect = await readDetectRegions(projectId, pageIndex);
+  if (!detect || detect.regions.length === 0) {
+    return provider.recognize({ pngBytes, pageIndex, language, signal });
+  }
+
+  // Decode the page into a canvas once so we can crop cheaply.
+  const blob = new Blob([pngBytes], { type: "image/png" });
+  const bitmap = await createImageBitmap(blob);
+  const pageSize = { width: bitmap.width, height: bitmap.height };
+
+  const combined: OcrResult = {
+    providerId: provider.id,
+    pageSize,
+    text: "",
+    hocr: "",
+    words: [],
+    lines: [],
+  };
+
+  for (const region of detect.regions) {
+    if (signal?.aborted) break;
+    const crop = new OffscreenCanvas(region.width, region.height);
+    const ctx = crop.getContext("2d");
+    if (!ctx) continue;
+    ctx.drawImage(
+      bitmap,
+      region.x,
+      region.y,
+      region.width,
+      region.height,
+      0,
+      0,
+      region.width,
+      region.height,
+    );
+    const cropBlob = await crop.convertToBlob({ type: "image/png" });
+    const cropBytes = await cropBlob.arrayBuffer();
+    const regionResult = await provider.recognize({
+      pngBytes: cropBytes,
+      pageIndex,
+      language,
+      signal,
+    });
+
+    // Offset every bbox back into page coordinates.
+    const regionWords = regionResult.words.map((w) => ({
+      ...w,
+      bbox: {
+        x: w.bbox.x + region.x,
+        y: w.bbox.y + region.y,
+        width: w.bbox.width,
+        height: w.bbox.height,
+      },
+    }));
+    combined.words.push(...regionWords);
+    combined.lines.push({
+      text: regionResult.text.trim(),
+      bbox: region,
+      words: regionWords,
+    });
+    combined.text = combined.text
+      ? `${combined.text}\n${regionResult.text.trim()}`
+      : regionResult.text.trim();
+  }
+
+  bitmap.close?.();
+  return combined;
 }
 
 export async function readOcrResult(
