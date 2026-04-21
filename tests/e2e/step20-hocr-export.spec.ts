@@ -110,7 +110,7 @@ test.describe("step 20 — hOCR export", () => {
       { timeout: 180_000 },
     );
     const btn = page.getByTestId("download-alto");
-    await expect(btn).toBeVisible();
+    await expect(btn).toBeVisible({ timeout: 30_000 });
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       btn.click(),

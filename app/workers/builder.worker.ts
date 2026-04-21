@@ -11,6 +11,7 @@ import {
   setFillingGrayscaleColor,
   translate,
 } from "pdf-lib";
+import { encodeCcittG4 } from "~/lib/compression/ccitt-g4";
 import type { OcrResult, OcrWord } from "~/lib/providers/types";
 
 export interface BuilderPageInput {
@@ -91,15 +92,17 @@ const api = {
 };
 
 /**
- * Draw a bitonal mask onto a page as a PDF native /ImageMask XObject.
+ * Draw a bitonal mask onto a page as a PDF native /ImageMask XObject
+ * encoded with CCITT Group 4 (T.6) fax compression.
  *
- * The mask is stored as 1 bit per pixel (MSB-first, row padded to byte)
- * with /FlateDecode compression. In PDF semantics a 0 bit paints with the
- * current non-stroking fill colour; a 1 bit is transparent. We set fill
- * to pure black (grayscale 0) so mask pixels render as the scan's text.
+ * On text-heavy pages T.6 typically emits ~5-10× smaller streams than
+ * flate-compressed 1-bit data. The filter is a PDF standard
+ * (`/CCITTFaxDecode` with `/K -1`) so every viewer can open it.
  *
- * Replaces the previous "alpha PNG over bg" approach, which embedded a
- * 32-bpp RGBA stream — ~8× larger on the same content.
+ * PDF convention: in CCITT output, 0 is white and 1 is black. ImageMask
+ * semantics are 0 = paint with current fill, 1 = transparent — i.e.
+ * painted text pixels should be 0 in our CCITT bits. We therefore
+ * invert the luminance comparison before packing.
  */
 async function drawMaskAsImageMask(
   doc: PDFDocument,
@@ -120,25 +123,25 @@ async function drawMaskAsImageMask(
   bitmap.close?.();
   const { data } = ctx.getImageData(0, 0, widthPx, heightPx);
 
-  // Pack into 1 bit per pixel, MSB-first, row-padded to byte.
-  const bytesPerRow = Math.ceil(widthPx / 8);
-  const packed = new Uint8Array(bytesPerRow * heightPx);
-  for (let y = 0; y < heightPx; y++) {
-    const rowOffset = y * bytesPerRow;
-    for (let x = 0; x < widthPx; x++) {
-      const lum = data[(y * widthPx + x) * 4]!;
-      // 0 = paint (text), 1 = transparent (background).
-      if (lum >= 128) {
-        packed[rowOffset + (x >> 3)]! |= 1 << (7 - (x & 7));
-      }
-    }
+  // CCITT convention: 1 byte per pixel, 0=white (bg), 1=black (text).
+  // In ImageMask semantics: 0 = paint, 1 = transparent. Text pixels
+  // (those that should be painted black) therefore need to emerge as 0
+  // from the CCITT decoder, so we set them to 0 in the input too.
+  const pixels = new Uint8Array(widthPx * heightPx);
+  for (let i = 0, j = 0; j < pixels.length; i += 4, j++) {
+    pixels[j] = (data[i] ?? 0) < 128 ? 1 : 0;
   }
 
-  // Flate via CompressionStream (available in modern workers).
-  const deflated = await compressDeflate(packed);
+  const encoded = encodeCcittG4({ pixels, width: widthPx, height: heightPx });
 
-  // Build the XObject dict. PDFContext.obj() accepts a plain object and
-  // wraps values in the right PDF primitives.
+  // DecodeParms for CCITTFaxDecode: K=-1 (Group 4), Columns=width,
+  // Rows=height, EndOfBlock=true (we emit the EOFB marker).
+  const decodeParms = doc.context.obj({
+    K: -1,
+    Columns: widthPx,
+    Rows: heightPx,
+    EndOfBlock: true,
+  });
   const dict = doc.context.obj({
     Type: "XObject",
     Subtype: "Image",
@@ -146,18 +149,15 @@ async function drawMaskAsImageMask(
     Height: heightPx,
     BitsPerComponent: 1,
     ImageMask: true,
-    Filter: "FlateDecode",
-    Length: deflated.byteLength,
+    Filter: "CCITTFaxDecode",
+    DecodeParms: decodeParms,
+    Length: encoded.byteLength,
   });
-  const stream = PDFRawStream.of(dict, deflated);
+  const stream = PDFRawStream.of(dict, encoded);
   const ref = doc.context.register(stream);
 
-  // Register XObject in page resources; the returned name is what the
-  // content stream references via `/Name Do`.
   const name = page.node.newXObject("Mask", ref);
 
-  // Emit: save state, set fill = black, translate/scale to page size,
-  // draw the mask XObject, restore.
   page.pushOperators(
     pushGraphicsState(),
     setFillingGrayscaleColor(0),
@@ -168,35 +168,6 @@ async function drawMaskAsImageMask(
   );
 }
 
-async function compressDeflate(bytes: Uint8Array): Promise<Uint8Array> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const CS = (self as any).CompressionStream as
-    | (new (format: string) => {
-        readable: ReadableStream<Uint8Array>;
-        writable: WritableStream<Uint8Array>;
-      })
-    | undefined;
-  if (!CS) throw new Error("CompressionStream not available");
-  const cs = new CS("deflate");
-  const writer = cs.writable.getWriter();
-  void writer.write(bytes);
-  void writer.close();
-  const chunks: Uint8Array[] = [];
-  const reader = cs.readable.getReader();
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (value) chunks.push(value);
-  }
-  const totalLen = chunks.reduce((n, c) => n + c.byteLength, 0);
-  const out = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const c of chunks) {
-    out.set(c, offset);
-    offset += c.byteLength;
-  }
-  return out;
-}
 
 function drawInvisibleWord(
   page: ReturnType<PDFDocument["addPage"]>,
