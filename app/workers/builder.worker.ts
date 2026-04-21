@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
-import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import type { OcrResult, OcrWord } from "~/lib/providers/types";
 
 /** Per-page OCR data needed for the overlay. */
@@ -58,22 +58,16 @@ const api = {
       if (!page) continue;
 
       const rot = overlay.appliedRotation ?? 0;
-
-      // Set the /Rotate flag so viewers display the page upright.
-      // This is metadata only — no image re-encoding.
-      if (rot !== 0) {
-        page.setRotation(degrees(rot));
-      }
-
-      // After rotation the "visible" page size changes for 90/270,
-      // but pdf-lib's page.getSize() returns the *mediabox* size
-      // (pre-rotation). For text placement we need the mediabox coords
-      // because drawText operates in that frame.
       const { width: mediaW, height: mediaH } = page.getSize();
 
-      // OCR ran on the rotated image, so its coordinate frame matches
-      // the rotated (displayed) frame. We need to map OCR coords back
-      // to the unrotated mediabox for drawText.
+      // OCR ran on the preprocessed (rotated) image. We transform its
+      // coords back to the source PDF's mediabox frame so the invisible
+      // text lands on the right pixels regardless of page orientation.
+      // /Rotate is NOT set — adding display rotation on top of coord
+      // transforms is complex and easy to get wrong. The text matches
+      // the scan orientation, so search/select works correctly. Viewers
+      // that honour the source PDF's existing /Rotate (if any) will
+      // still show the page in its original orientation.
       for (const word of overlay.ocr.words) {
         if (!word.text.trim()) continue;
         const mapped = mapWordToMediaBox(
@@ -96,16 +90,19 @@ const api = {
 
 /**
  * Map a word's bbox from the OCR (rotated) coordinate frame back to the
- * PDF mediabox (unrotated) frame. The /Rotate flag tells the viewer to
- * rotate the display, but drawText operates in the raw mediabox coords.
+ * source PDF's mediabox frame.
  *
- * OCR frame: top-left origin, y-down, dimensions = rotated image size.
- * Mediabox:  bottom-left origin, y-up, dimensions = unrotated page.
+ * The preprocess stage rotated the render image by `rot` degrees CW
+ * before OCR. We need to undo that rotation on the word coordinates so
+ * the invisible text lands at the same physical pixel position in the
+ * unrotated source page.
  *
- * For rot=0  → identity (direct mapping).
- * For rot=180 → flip both axes: (ocrW-x-w, ocrH-y-h).
- * For rot=90  → CW rotation: page was rendered landscape from portrait.
- * For rot=270 → CCW rotation.
+ * All coordinates are in top-left/y-down space (OCR convention).
+ * drawInvisibleWord handles the final y-flip to PDF bottom-left/y-up.
+ *
+ * Derivation: if preprocess rotated the source image CW by R degrees,
+ * the inverse is CCW by R (= CW by 360−R). Apply that inverse to each
+ * OCR bbox to get back to source pixel positions.
  */
 function mapWordToMediaBox(
   word: OcrWord,
@@ -119,13 +116,12 @@ function mapWordToMediaBox(
   const ocrH = ocrSize.height;
 
   if (rot === 0) {
-    return {
-      word,
-      sx: mediaW / ocrW,
-      sy: mediaH / ocrH,
-    };
+    return { word, sx: mediaW / ocrW, sy: mediaH / ocrH };
   }
 
+  // For 180°: source was WxH, preprocessed is WxH (same dims).
+  // Inverse: rotate 180° = flip both axes.
+  // Source pixel (sx, sy) = (ocrW - x - w, ocrH - y - h).
   if (rot === 180) {
     return {
       word: {
@@ -137,24 +133,30 @@ function mapWordToMediaBox(
     };
   }
 
+  // For 90° CW preprocess: source was HxW (portrait), preprocessed is WxH
+  // (landscape, rotated CW). Inverse is 90° CCW = 270° CW.
+  // Source pixel: (sy, ocrW - sx - sw) where s=source, o=ocr.
+  // In terms of OCR bbox (x, y, w, h):
+  //   source_x = y, source_y = ocrW - x - w, source_w = h, source_h = w
   if (rot === 90) {
-    // OCR image was rotated 90° CW from the source. In OCR frame (ocrW×ocrH)
-    // the source was (ocrH×ocrW). Mediabox is (mediaW×mediaH) = (ocrH×ocrW)-scale.
     return {
       word: {
         ...word,
-        bbox: { x: ocrH - y - h, y: x, width: h, height: w },
+        bbox: { x: y, y: ocrW - x - w, width: h, height: w },
       },
+      // Source image dims were ocrH × ocrW (swapped).
       sx: mediaW / ocrH,
       sy: mediaH / ocrW,
     };
   }
 
-  // rot === 270
+  // For 270° CW preprocess: source was HxW, preprocessed is WxH
+  // (rotated 270° CW = 90° CCW). Inverse is 90° CW.
+  // Source pixel: (ocrH - y - h, x), source_w = h, source_h = w.
   return {
     word: {
       ...word,
-      bbox: { x: y, y: ocrW - x - w, width: h, height: w },
+      bbox: { x: ocrH - y - h, y: x, width: h, height: w },
     },
     sx: mediaW / ocrH,
     sy: mediaH / ocrW,
