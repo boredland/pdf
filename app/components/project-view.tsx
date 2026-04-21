@@ -85,10 +85,29 @@ export function ProjectView() {
 
   const onFileDrop = useCallback(
     async (files: File[]) => {
-      // Batch drop: create a project per file, sequentially so we don't
-      // thrash the render worker pool. The last file wins as the active
-      // project (matches what the user would see after a single drop).
+      // Batch drop: create a project per file. ZIP entries fan out into
+      // one project per enclosed PDF/image. Sequential ingest so the
+      // render worker pool doesn't thrash; the last ingested project
+      // wins as the active view.
       for (const file of files) {
+        if (/\.zip$/i.test(file.name) || file.type === "application/zip") {
+          const { unzipSync } = await import("fflate");
+          const bytes = await file.arrayBuffer();
+          const entries = unzipSync(new Uint8Array(bytes));
+          for (const [entryName, entryBytes] of Object.entries(entries)) {
+            if (!/\.(pdf|jpe?g|png)$/i.test(entryName)) continue;
+            // Strip the archive's directory prefix for a cleaner name.
+            const displayName = entryName.split("/").pop() ?? entryName;
+            const mime = /\.pdf$/i.test(entryName)
+              ? "application/pdf"
+              : /\.png$/i.test(entryName)
+                ? "image/png"
+                : "image/jpeg";
+            const ab = entryBytes.slice().buffer;
+            await ingest(displayName, ab, mime);
+          }
+          continue;
+        }
         const bytes = await file.arrayBuffer();
         await ingest(file.name, bytes, file.type);
       }
@@ -471,7 +490,7 @@ function DropZone(props: {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,image/jpeg,image/png"
+        accept="application/pdf,image/jpeg,image/png,application/zip,.zip"
         multiple
         data-testid="file-input"
         className="hidden"

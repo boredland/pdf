@@ -137,8 +137,9 @@
       multiple PDFs/images at once. Creates one project per file
       sequentially; most-recent becomes active. Project switcher
       dropdown appears once you have ≥2 projects.           (shipped)
-- [ ] ZIP batch import (unpack a .zip full of PDFs). Needs a small
-      zip parser — not wired today.
+- [x] ZIP batch import: dropped .zip archives are unpacked via fflate
+      (8 KB dep) and each enclosed PDF/PNG/JPEG becomes a project.
+      Non-image entries are silently skipped.               (shipped)
 - [x] Export hOCR (XHTML). "Download hOCR" button appears once any
       page has OCR; prefers Tesseract's native hocr, synthesises
       per-word bboxes for hosted providers. Output is a single

@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { zipSync } from "fflate";
 
 async function waitForHarness(page: Page) {
   await page.waitForFunction(() => typeof window.__pdfApp !== "undefined", null, {
@@ -58,5 +61,40 @@ test.describe("step 21 — batch import + project switcher", () => {
       timeout: 15_000,
     });
     await expect(page.getByTestId("project-switcher-wrap")).toBeHidden();
+  });
+
+  test("ZIP archive fans out into one project per enclosed PDF", async ({
+    page,
+  }) => {
+    // Build the zip on the Node side from the bundled fallback PDF. Doing
+    // it here keeps the in-browser evaluate simple (the bundler isn't in
+    // play there, so the page can't dynamically import fflate directly).
+    const pdfBytes = readFileSync(
+      path.join(process.cwd(), "public/examples/fallback.pdf"),
+    );
+    const pdfU8 = new Uint8Array(pdfBytes);
+    const packed = zipSync({
+      "zero.pdf": pdfU8,
+      "nested/one.pdf": pdfU8,
+      // Non-PDF entries must be ignored by the ingest code.
+      "README.txt": new TextEncoder().encode("hello"),
+    });
+
+    await page.getByTestId("file-input").setInputFiles({
+      name: "docs.zip",
+      mimeType: "application/zip",
+      buffer: Buffer.from(packed),
+    });
+
+    // Two projects expected: zero.pdf, one.pdf (directory stripped). The
+    // active project is whichever was ingested last; option labels are
+    // just the basenames we assigned.
+    const switcher = page.getByTestId("project-switcher");
+    await expect(switcher.locator("option")).toHaveCount(2, {
+      timeout: 20_000,
+    });
+    const labels = await switcher.locator("option").allTextContents();
+    expect(labels.some((l) => l.includes("zero.pdf"))).toBe(true);
+    expect(labels.some((l) => l.includes("one.pdf"))).toBe(true);
   });
 });

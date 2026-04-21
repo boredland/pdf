@@ -59,8 +59,11 @@ test.describe("step 20 — hOCR export", () => {
       "done",
       { timeout: 180_000 },
     );
+    // The button waits for pages with OCR status to be observed via the
+    // Dexie live-query. Under parallel load that can lag a few hundred
+    // ms past the data attribute; give it a generous timeout.
     const btn = page.getByTestId("download-hocr");
-    await expect(btn).toBeVisible();
+    await expect(btn).toBeVisible({ timeout: 30_000 });
 
     const [download] = await Promise.all([
       page.waitForEvent("download"),
