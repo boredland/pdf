@@ -14,6 +14,8 @@ export interface MrcInput {
   skewAngleDegrees?: number;
   /** OSD cardinal pre-rotation applied by preprocess (0/90/180/270). */
   osdAngleDegrees?: 0 | 90 | 180 | 270;
+  /** Luminance threshold for mask extraction (0–255). Default 128. */
+  maskThreshold?: number;
 }
 
 export interface MrcOutput {
@@ -331,7 +333,7 @@ const api = {
       throw new Error("preprocessed and render page dimensions disagree");
     }
 
-    const mask = extractMask(preImg);
+    const mask = extractMask(preImg, input.maskThreshold ?? 128);
     let textPixels = 0;
     for (let i = 0; i < mask.length; i++) if (mask[i] === 1) textPixels++;
     const maskCoverage = mask.length > 0 ? textPixels / mask.length : 0;

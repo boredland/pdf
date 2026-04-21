@@ -139,6 +139,27 @@ export function SettingsPanel({
           {project.settings.preprocess.denoiseRadius}
         </span>
       </label>
+      <label
+        className="flex items-center gap-2"
+        title="Lower keeps faint text; higher drops antialiased grey pixels from the mask."
+      >
+        <span className="shrink-0">Mask threshold</span>
+        <input
+          type="range"
+          data-testid="settings-mask-threshold"
+          min={64}
+          max={224}
+          step={8}
+          value={project.settings.preprocess.maskThreshold}
+          disabled={disabled}
+          onChange={(e) =>
+            void update("maskThreshold", Number.parseInt(e.target.value, 10))
+          }
+        />
+        <span className="tabular-nums text-xs text-slate-400">
+          {project.settings.preprocess.maskThreshold}
+        </span>
+      </label>
       <label className="flex items-center gap-2 sm:col-span-3">
         <span className="shrink-0">OCR provider</span>
         <select

@@ -29,6 +29,12 @@ export interface ProjectSettings {
     orientationDetect: boolean;
     binarizer: "sauvola" | "otsu";
     denoiseRadius: number;
+    /**
+     * Luminance threshold used by the MRC worker to classify a pixel as
+     * text (<threshold) or background. 128 is a safe middle ground;
+     * lower values keep faint text, higher values drop antialiasing.
+     */
+    maskThreshold: number;
   };
   detect: { enabled: boolean };
   ocr: { providerId: string; language: string };
@@ -122,6 +128,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
     orientationDetect: true,
     binarizer: "sauvola",
     denoiseRadius: 1,
+    maskThreshold: 128,
   },
   detect: { enabled: true },
   ocr: { providerId: "tesseract", language: "eng" },
