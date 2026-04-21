@@ -529,12 +529,30 @@ function PageGrid({
     >
       {pages.map((page, displayIndex) => {
         const runtime = running.get(page.index);
+        const isRunning =
+          runtime?.kind === "stage" && runtime.status === "running";
+        const runningStage = isRunning ? runtime.stage : null;
         const status =
           runtime?.kind === "stage" && runtime.stage === "render"
             ? runtime.status
             : page.status.render
               ? "done"
               : "queued";
+
+        // Compact per-page status: show which stage is active, or the
+        // highest completed stage.
+        const stageLabel = runningStage
+          ? runningStage
+          : page.status.ocr
+            ? "ocr done"
+            : page.status.detect
+              ? "detect done"
+              : page.status.preprocess
+                ? "preprocess done"
+                : page.status.render
+                  ? "rendered"
+                  : "queued";
+
         return (
           <li
             key={page.id}
@@ -568,7 +586,13 @@ function PageGrid({
                 )}
               </div>
               <p className="mt-1 text-center text-[10px] text-slate-400">
-                page {displayIndex + 1} · {status}
+                page {displayIndex + 1}
+                {" · "}
+                {isRunning ? (
+                  <span className="text-sky-300">{runningStage}…</span>
+                ) : (
+                  stageLabel
+                )}
               </p>
             </button>
             <button
