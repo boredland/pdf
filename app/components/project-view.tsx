@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getDb, type Page, type Project } from "~/lib/storage/db";
-import { createProjectFromBytes, removePage } from "~/lib/projects";
+import {
+  createProjectFromBytes,
+  listProjects,
+  removePage,
+} from "~/lib/projects";
 import { runRenderPipeline, ensurePageRows } from "~/lib/pipeline/render-pipeline";
 import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
@@ -46,6 +50,19 @@ export function ProjectView() {
     [activeProjectId],
   );
 
+  const allProjects = useLiveQuery<Project[]>(
+    async () => listProjects(),
+    [],
+  );
+
+  // If nothing is selected yet but projects exist, default to the most
+  // recently created one so a page reload shows the user their work.
+  useEffect(() => {
+    if (!activeProjectId && allProjects && allProjects.length > 0) {
+      setActiveProjectId(allProjects[0]!.id);
+    }
+  }, [activeProjectId, allProjects]);
+
   const runningStages = useProgressMap(activeProjectId);
 
   const ingest = useCallback(async (name: string, bytes: ArrayBuffer, mimeType?: string) => {
@@ -67,9 +84,14 @@ export function ProjectView() {
   }, []);
 
   const onFileDrop = useCallback(
-    async (file: File) => {
-      const bytes = await file.arrayBuffer();
-      await ingest(file.name, bytes, file.type);
+    async (files: File[]) => {
+      // Batch drop: create a project per file, sequentially so we don't
+      // thrash the render worker pool. The last file wins as the active
+      // project (matches what the user would see after a single drop).
+      for (const file of files) {
+        const bytes = await file.arrayBuffer();
+        await ingest(file.name, bytes, file.type);
+      }
     },
     [ingest],
   );
@@ -168,11 +190,34 @@ export function ProjectView() {
       <DropZone
         dragging={dragging}
         onDragChange={setDragging}
-        onFile={(file) => void onFileDrop(file)}
+        onFile={(files) => void onFileDrop(files)}
         onLoadExample={(id) => void onLoadExample(id)}
         disabled={isBusy}
       />
       <ApiKeysPanel />
+      {allProjects && allProjects.length > 1 && (
+        <label
+          className="flex items-center gap-2 text-sm text-slate-300"
+          data-testid="project-switcher-wrap"
+        >
+          <span className="text-xs text-slate-400">Project</span>
+          <select
+            data-testid="project-switcher"
+            value={activeProjectId ?? ""}
+            onChange={(e) => setActiveProjectId(e.target.value || null)}
+            className="rounded border border-slate-700 bg-slate-800 px-2 py-1"
+          >
+            {allProjects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.pageCount || "—"}p)
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-slate-400">
+            {allProjects.length} total
+          </span>
+        </label>
+      )}
       {error && (
         <p className="text-sm text-red-400" data-testid="project-error">
           {error}
@@ -355,7 +400,7 @@ function getRunLabel(project: Project | undefined, pages: Page[]): string {
 function DropZone(props: {
   dragging: boolean;
   onDragChange: (v: boolean) => void;
-  onFile: (f: File) => void;
+  onFile: (files: File[]) => void;
   onLoadExample: (id: ExampleId) => void;
   disabled: boolean;
 }) {
@@ -372,8 +417,8 @@ function DropZone(props: {
       onDrop={(e) => {
         e.preventDefault();
         onDragChange(false);
-        const file = e.dataTransfer.files[0];
-        if (file) onFile(file);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0) onFile(files);
       }}
       className={`flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center transition ${
         dragging ? "border-sky-400 bg-sky-500/10" : "border-slate-700 bg-slate-900/40"
@@ -426,12 +471,13 @@ function DropZone(props: {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,image/jpeg,image/png"
+        multiple
         data-testid="file-input"
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onFile(file);
+          const files = Array.from(e.target.files ?? []);
+          if (files.length > 0) onFile(files);
           e.target.value = "";
         }}
       />

@@ -133,7 +133,12 @@
 - [ ] CRAFT ONNX text detector (swap MSER when better IoU proven)
 - [ ] Optional CORS proxy worker for blocked providers
 - [ ] Dewarping (book-spine curvature)
-- [ ] Batch import (ZIP / multi-PDF)
+- [x] Batch import (multi-PDF): file-input + drop zone both accept
+      multiple PDFs/images at once. Creates one project per file
+      sequentially; most-recent becomes active. Project switcher
+      dropdown appears once you have ≥2 projects.           (shipped)
+- [ ] ZIP batch import (unpack a .zip full of PDFs). Needs a small
+      zip parser — not wired today.
 - [x] Export hOCR (XHTML). "Download hOCR" button appears once any
       page has OCR; prefers Tesseract's native hocr, synthesises
       per-word bboxes for hosted providers. Output is a single
