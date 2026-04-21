@@ -91,11 +91,19 @@ export async function runBuildPipeline(
         pageIndexMap.push(-1);
         continue;
       }
+      // The applied rotation comes from preprocess (OSD or manual override).
+      // The builder sets /Rotate on the PDF page so viewers display it
+      // upright — without re-encoding.
+      const appliedRotation =
+        (page.rotationOverride ??
+          page.status.preprocess?.osdAngleDegrees ??
+          0) as 0 | 90 | 180 | 270;
       pageIndexMap.push(overlayPages.length);
       overlayPages.push({
         ocr,
         pageWidthPt: ocr.pageSize.width,
         pageHeightPt: ocr.pageSize.height,
+        appliedRotation,
       });
     }
 
