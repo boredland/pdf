@@ -75,7 +75,6 @@ function rankStage(stage: Stage): number {
     preprocess: 1,
     detect: 2,
     ocr: 3,
-    mrc: 4,
     build: 5,
   };
   return order[stage];

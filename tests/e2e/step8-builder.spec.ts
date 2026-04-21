@@ -123,7 +123,6 @@ test.describe("step 8 — searchable PDF builder", () => {
       const before = {
         render: window.__pdfRenderCallCount ?? 0,
         preprocess: window.__pdfPreprocessCallCount ?? 0,
-        mrc: window.__pdfMrcCallCount ?? 0,
         build: window.__pdfBuildCallCount ?? 0,
       };
 
@@ -142,14 +141,12 @@ test.describe("step 8 — searchable PDF builder", () => {
       return {
         renderDelta: (window.__pdfRenderCallCount ?? 0) - before.render,
         preDelta: (window.__pdfPreprocessCallCount ?? 0) - before.preprocess,
-        mrcDelta: (window.__pdfMrcCallCount ?? 0) - before.mrc,
         buildDelta: (window.__pdfBuildCallCount ?? 0) - before.build,
       };
     }, projectId);
 
     expect(counts.renderDelta).toBe(0);
     expect(counts.preDelta).toBe(0);
-    expect(counts.mrcDelta).toBe(0);
     expect(counts.buildDelta).toBe(1);
   });
 

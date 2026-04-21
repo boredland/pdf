@@ -66,7 +66,7 @@ export async function listProjects(): Promise<Project[]> {
 
 /**
  * Remove a single page from a project. Wipes every artifact the page
- * owned (render, preprocess, detect, ocr, mrc and their overlays), drops
+ * owned (render, preprocess, detect, ocr and their overlays), drops
  * the page row, decrements project.pageCount, and invalidates
  * project.build (the page-count changed, so the prior build is stale).
  *

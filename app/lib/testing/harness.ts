@@ -19,7 +19,6 @@ import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { measureSkew } from "~/lib/workers/preprocess-client";
 import { runDetectPipeline, readDetectRegions } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline, readOcrResult } from "~/lib/pipeline/ocr-pipeline";
-import { runMrcPipeline, readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
 import { getPageCount as renderGetPageCount } from "~/lib/workers/render-client";
 import { runStage, runFromStage, PIPELINE_ORDER } from "~/lib/pipeline/run-stage";
@@ -45,7 +44,6 @@ import {
   storeApiKey,
 } from "~/lib/api-keys";
 import { rewindToStage, setPageRotationOverride } from "~/lib/pipeline/rewind";
-import { encodeJbig2, encodeJbig2Document } from "~/lib/compression/jbig2";
 import {
   exportProjectAlto,
   exportProjectHocr,
@@ -102,18 +100,12 @@ declare global {
         readOcrResult: typeof readOcrResult;
         listProviders: typeof listProviders;
       };
-      mrc: {
-        runMrcPipeline: typeof runMrcPipeline;
-        readMrcManifest: typeof readMrcManifest;
-      };
       build: {
         runBuildPipeline: typeof runBuildPipeline;
         readBuildOutput: typeof readBuildOutput;
       };
       exportHocr: typeof exportProjectHocr;
       exportAlto: typeof exportProjectAlto;
-      encodeJbig2: typeof encodeJbig2;
-      encodeJbig2Document: typeof encodeJbig2Document;
       progress: {
         compute: typeof computeProgress;
         predict: typeof predictInvalidation;
@@ -169,7 +161,6 @@ declare global {
     __pdfRenderCallCount?: number;
     __pdfPreprocessCallCount?: number;
     __pdfDetectCallCount?: number;
-    __pdfMrcCallCount?: number;
     __pdfBuildCallCount?: number;
   }
 }
@@ -218,12 +209,9 @@ export function installTestHarness(): void {
     preprocess: { runPreprocessPipeline, measureSkew },
     detect: { runDetectPipeline, readDetectRegions },
     ocr: { runOcrPipeline, readOcrResult, listProviders },
-    mrc: { runMrcPipeline, readMrcManifest },
     build: { runBuildPipeline, readBuildOutput },
     exportHocr: exportProjectHocr,
     exportAlto: exportProjectAlto,
-    encodeJbig2,
-    encodeJbig2Document,
     progress: {
       compute: computeProgress,
       predict: predictInvalidation,

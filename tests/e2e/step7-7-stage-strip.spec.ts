@@ -34,7 +34,7 @@ test.describe("step 7.7 — per-stage thumbs + image modal", () => {
     await expect(page.getByTestId("stage-strip-0")).toBeVisible();
 
     // Stages in the critical path (render→preprocess→detect→ocr) are
-    // enabled after the UI "Run". MRC isn't in the default pipeline —
+    // enabled after the UI "Run". Stages in the critical path:
     // its thumb may be disabled or pending.
     for (const stage of ["render", "preprocess", "detect", "ocr"]) {
       const thumb = page.getByTestId(`stage-thumb-0-${stage}`);
@@ -130,7 +130,7 @@ test.describe("step 7.7 — per-stage thumbs + image modal", () => {
     }, projectId);
 
     await page.getByTestId("page-details-summary-0").click();
-    // After rewinding to detect, detect/ocr/mrc should be pending again.
+    // After rewinding to detect, detect/ocr should be pending again.
     await expect(page.getByTestId("stage-thumb-0-detect")).toBeDisabled({
       timeout: 10_000,
     });

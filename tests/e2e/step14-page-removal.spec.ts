@@ -37,7 +37,7 @@ test.describe("step 14 — page removal", () => {
         .where({ projectId: project.id })
         .toArray();
       const removedPage = beforePages.find((p) => p.index === 1)!;
-      const probePath = removedPage.status.mrc?.artifactPath ?? null;
+      const probePath = removedPage.status.ocr?.artifactPath ?? null;
       const probeExistsBefore = probePath
         ? !!(await app.opfs.readBlob(probePath))
         : false;

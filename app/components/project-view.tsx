@@ -10,8 +10,6 @@ import { runRenderPipeline, ensurePageRows } from "~/lib/pipeline/render-pipelin
 import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
-// MRC is still available via the stage picker but no longer in the "all" path.
-// import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
 import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
 import { exportProjectAlto, exportProjectHocr } from "~/lib/export/export-hocr";
 import { PIPELINE_ORDER, runStage } from "~/lib/pipeline/run-stage";
@@ -68,7 +66,7 @@ export function ProjectView() {
 
   const ingest = useCallback(async (name: string, bytes: ArrayBuffer, mimeType?: string) => {
     // Project creation only: we deliberately don't auto-run the pipeline.
-    // The user should review settings (languages, OCR provider, MRC preset,
+    // The user should review settings (languages, OCR provider, 
     // preprocess toggles) *before* anything kicks off — pipelines run only
     // once they click the Run button.
     setError(null);
@@ -547,7 +545,6 @@ function PageGrid({
             data-preprocess-status={page.status.preprocess ? "done" : "pending"}
             data-detect-status={page.status.detect ? "done" : "pending"}
             data-ocr-status={page.status.ocr ? "done" : "pending"}
-            data-mrc-status={page.status.mrc ? "done" : "pending"}
             className="rounded-md border border-slate-800 bg-slate-900/60 p-2"
           >
             <button

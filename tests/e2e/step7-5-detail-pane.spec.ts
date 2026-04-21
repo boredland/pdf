@@ -46,7 +46,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     await expect(page.getByTestId("detail-pane")).toBeVisible();
     await expect(page.getByTestId("detail-title")).toContainText("Page 1 of 3");
 
-    for (const id of ["render", "preprocess", "detect", "ocr", "mrc"]) {
+    for (const id of ["render", "preprocess", "detect", "ocr"]) {
       await expect(page.getByTestId(`detail-tab-${id}`)).toBeVisible();
     }
   });
@@ -73,9 +73,6 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     await page.getByTestId("detail-tab-ocr").click();
     await expect(page.getByTestId("detail-ocr-text")).toContainText(/Page|page/);
 
-    // MRC is no longer in the default "all" pipeline — its tab still
-    // appears but the artifact is empty until run via the stage picker.
-    await page.getByTestId("detail-tab-mrc").click();
   });
 
   test("per-page re-run triggers only the selected stage for that page", async ({
@@ -88,7 +85,6 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
       render: window.__pdfRenderCallCount ?? 0,
       preprocess: window.__pdfPreprocessCallCount ?? 0,
       detect: window.__pdfDetectCallCount ?? 0,
-      mrc: window.__pdfMrcCallCount ?? 0,
     }));
 
     await page.evaluate(
@@ -109,18 +105,15 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
         const app = window.__pdfApp!;
         const project = (await app.projects.getProject(id))!;
         const renderBefore = window.__pdfRenderCallCount ?? 0;
-        const mrcBefore = window.__pdfMrcCallCount ?? 0;
         await app.pipeline.runStage(project, "ocr", { pageIndices: [1] });
         return {
           renderDelta: (window.__pdfRenderCallCount ?? 0) - renderBefore,
-          mrcDelta: (window.__pdfMrcCallCount ?? 0) - mrcBefore,
         };
       },
       { id: projectId },
     );
 
     expect(delta.renderDelta).toBe(0);
-    expect(delta.mrcDelta).toBe(0);
 
     // The OCR stage artifact was already cached (hash unchanged from the
     // initial bootstrapFull), so runStage short-circuited — verify by the

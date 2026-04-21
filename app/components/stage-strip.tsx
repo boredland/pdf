@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type { Page, Stage } from "~/lib/storage/db";
 import { readBlob } from "~/lib/storage/opfs";
 import { readOcrResult } from "~/lib/pipeline/ocr-pipeline";
-import { readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { ImageModal } from "./image-modal";
 
 interface Slot {
@@ -84,26 +83,6 @@ function buildSlots(page: Page): Slot[] {
           imageUrl: imageUrl ?? undefined,
           body,
         };
-      },
-    },
-    {
-      stage: "mrc",
-      label: "MRC",
-      thumbDataUrl: page.thumbnails?.mrc,
-      ready: !!page.status.mrc,
-      async getModal() {
-        const manifest = await readMrcManifest(page.projectId, page.index);
-        if (!manifest) return null;
-        const url = await blobUrl(manifest.composedPath);
-        return url
-          ? {
-              title: `MRC composed · ${(
-                (manifest.maskBytes + manifest.bgBytes) /
-                1024
-              ).toFixed(0)} KB`,
-              imageUrl: url,
-            }
-          : null;
       },
     },
   ];

@@ -1,7 +1,6 @@
 import { buildAltoDocument, type AltoPage } from "~/lib/export/alto";
 import { buildHocrDocument, type HocrPage } from "~/lib/export/hocr";
 import { readOcrResult } from "~/lib/pipeline/ocr-pipeline";
-import { readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { getDb, type Project } from "~/lib/storage/db";
 
 interface ShapedPage {
@@ -18,9 +17,8 @@ async function collectPages(projectId: string): Promise<ShapedPage[]> {
   for (const row of rows) {
     const ocr = await readOcrResult(projectId, row.index);
     if (!ocr) continue;
-    const manifest = await readMrcManifest(projectId, row.index);
-    const widthPx = manifest?.width ?? ocr.pageSize.width;
-    const heightPx = manifest?.height ?? ocr.pageSize.height;
+    const widthPx = ocr.pageSize.width;
+    const heightPx = ocr.pageSize.height;
     shaped.push({ pageIndex: row.index, ocr, widthPx, heightPx });
   }
   return shaped;

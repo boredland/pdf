@@ -3,18 +3,16 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { getDb, type Page, type Project, type Stage } from "~/lib/storage/db";
 import { readBlob } from "~/lib/storage/opfs";
 import { readOcrResult } from "~/lib/pipeline/ocr-pipeline";
-import { readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { runStage, runFromStage } from "~/lib/pipeline/run-stage";
 import { setPageRotationOverride } from "~/lib/pipeline/rewind";
 
-type TabId = "render" | "preprocess" | "detect" | "ocr" | "mrc";
+type TabId = "render" | "preprocess" | "detect" | "ocr";
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: "render", label: "Render" },
   { id: "preprocess", label: "Preprocess" },
   { id: "detect", label: "Detect" },
   { id: "ocr", label: "OCR" },
-  { id: "mrc", label: "MRC" },
 ];
 
 interface Props {
@@ -195,8 +193,6 @@ function StageContent({
       return <DetectView project={project} page={page} />;
     case "ocr":
       return <OcrView project={project} page={page} />;
-    case "mrc":
-      return <MrcView project={project} page={page} />;
   }
 }
 
@@ -393,81 +389,6 @@ function OcrView({ project, page }: { project: Project; page: Page }) {
           </pre>
         </div>
       </div>
-    </div>
-  );
-}
-
-function MrcView({ project, page }: { project: Project; page: Page }) {
-  const [manifest, setManifest] = useState<Awaited<
-    ReturnType<typeof readMrcManifest>
-  > | null>(null);
-  const [layer, setLayer] = useState<"mask" | "bg" | "composed">("composed");
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const m = await readMrcManifest(project.id, page.index);
-      if (!cancelled) setManifest(m);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [project.id, page.index, page.status.mrc?.hash]);
-
-  const path = useMemo(() => {
-    if (!manifest) return undefined;
-    return layer === "mask"
-      ? manifest.maskPath
-      : layer === "bg"
-        ? manifest.bgPath
-        : manifest.composedPath;
-  }, [manifest, layer]);
-
-  if (!manifest) {
-    return <EmptyState label="Run MRC to produce mask/background/composed layers." />;
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-1" role="tablist">
-        {(["mask", "bg", "composed"] as const).map((id) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={layer === id}
-            data-testid={`detail-mrc-layer-${id}`}
-            onClick={() => setLayer(id)}
-            className={`rounded px-3 py-1 text-xs ${
-              layer === id
-                ? "bg-sky-500/20 text-sky-200"
-                : "border border-slate-700 text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            {id === "bg" ? "Background" : id === "mask" ? "Mask" : "Composed"}
-          </button>
-        ))}
-      </div>
-      <dl
-        className="grid grid-cols-3 gap-2 text-xs text-slate-400"
-        data-testid="detail-mrc-stats"
-      >
-        <Stat label="Mask" value={`${Math.round(manifest.maskBytes / 1024)} KB`} />
-        <Stat label="Background" value={`${Math.round(manifest.bgBytes / 1024)} KB`} />
-        <Stat
-          label="Round-trip MAD"
-          value={manifest.meanAbsoluteDifference.toFixed(1)}
-        />
-      </dl>
-      <ImageArtifact path={path} />
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="uppercase tracking-wide text-[10px] text-slate-400">{label}</dt>
-      <dd className="text-slate-200">{value}</dd>
     </div>
   );
 }

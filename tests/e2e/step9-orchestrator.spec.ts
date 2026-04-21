@@ -144,9 +144,9 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
       projectId,
     );
 
-    // preprocess + detect + ocr + mrc + build = 5 stage kinds, across 3 pages
-    // (build is project-wide so 1 entry). That's 3×4 + 1 = 13 artifacts.
-    expect(prediction.artifactCount).toBe(13);
+    // preprocess + detect + ocr + build = 4 stage kinds, across 3 pages
+    // (build is project-wide so 1 entry). That.s 3×3 + 1 = 10 artifacts.
+    expect(prediction.artifactCount).toBe(10);
     expect(prediction.byteCount).toBeGreaterThan(50_000);
     expect(prediction.stages).toContain("preprocess");
     expect(prediction.stages).toContain("build");
@@ -195,7 +195,7 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
   }) => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
-    // Wait for all 3 pages' MRC to finish so the byte count stabilises
+    // Wait for all 3 pages' OCR to finish so the byte count stabilises
     // before we snapshot — otherwise we can race a mid-write and measure
     // a prefix state that'll grow after the reload.
     for (const i of [0, 1, 2]) {

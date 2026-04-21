@@ -58,14 +58,6 @@ export function SettingsPanel({
     await confirmIfDestructive("OCR provider", ["ocr"], apply);
   }
 
-  async function updateMrcPreset(preset: Project["settings"]["mrc"]["preset"]) {
-    const apply = async () => {
-      await getDb().projects.update(project.id, {
-        settings: { ...project.settings, mrc: { preset } },
-      });
-    };
-    await confirmIfDestructive("MRC preset", ["mrc"], apply);
-  }
 
   const keyedProviderIds = useLiveQuery(
     async () => (await getDb().apiKeys.toArray()).map((row) => row.providerId),
@@ -139,27 +131,6 @@ export function SettingsPanel({
           {project.settings.preprocess.denoiseRadius}
         </span>
       </label>
-      <label
-        className="flex items-center gap-2"
-        title="Lower keeps faint text; higher drops antialiased grey pixels from the mask."
-      >
-        <span className="shrink-0">Mask threshold</span>
-        <input
-          type="range"
-          data-testid="settings-mask-threshold"
-          min={64}
-          max={224}
-          step={8}
-          value={project.settings.preprocess.maskThreshold}
-          disabled={disabled}
-          onChange={(e) =>
-            void update("maskThreshold", Number.parseInt(e.target.value, 10))
-          }
-        />
-        <span className="tabular-nums text-xs text-slate-400">
-          {project.settings.preprocess.maskThreshold}
-        </span>
-      </label>
       <label className="flex items-center gap-2 sm:col-span-3">
         <span className="shrink-0">OCR provider</span>
         <select
@@ -174,24 +145,6 @@ export function SettingsPanel({
               {p.label}
             </option>
           ))}
-        </select>
-      </label>
-      <label className="flex items-center gap-2 sm:col-span-3">
-        <span className="shrink-0">Output compression</span>
-        <select
-          data-testid="settings-mrc-preset"
-          className="min-w-0 rounded border border-slate-700 bg-slate-800 px-2 py-1"
-          value={project.settings.mrc.preset}
-          disabled={disabled}
-          onChange={(e) =>
-            void updateMrcPreset(
-              e.target.value as Project["settings"]["mrc"]["preset"],
-            )
-          }
-        >
-          <option value="lossless">Lossless</option>
-          <option value="archival">Archival (JPEG 85%)</option>
-          <option value="compact">Compact (JPEG 50% · half DPI)</option>
         </select>
       </label>
       {pending && (

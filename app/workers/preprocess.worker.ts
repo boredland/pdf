@@ -355,7 +355,7 @@ const api = {
   async detect(input: DetectInput): Promise<DetectOutput> {
     const { cv } = (await loadOpenCv()) as { cv: CvAny };
     // Analyze the deskewed/binarised preprocessed image so the boxes land in
-    // the same coordinate frame as the OCR output and MRC mask.
+    // the same coordinate frame as the OCR output.
     const preImageData = await decodePng(input.preprocessedPngBytes);
     const preSrc = cv.matFromImageData(preImageData);
     let preGray: CvAny | null = null;

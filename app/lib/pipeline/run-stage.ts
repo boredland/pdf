@@ -3,7 +3,6 @@ import { runRenderPipeline } from "~/lib/pipeline/render-pipeline";
 import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
-import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
 import { runBuildPipeline } from "~/lib/pipeline/build-pipeline";
 
 export interface RunStageOptions {
@@ -18,7 +17,6 @@ const RUNNERS: Record<Stage, Runner> = {
   preprocess: runPreprocessPipeline,
   detect: runDetectPipeline,
   ocr: runOcrPipeline,
-  mrc: runMrcPipeline,
   // Build ignores pageIndices — it's a project-wide stage by nature.
   build: (project, options) => runBuildPipeline(project, { signal: options.signal }),
 };
@@ -28,7 +26,6 @@ export const PIPELINE_ORDER: Stage[] = [
   "preprocess",
   "detect",
   "ocr",
-  "mrc",
   "build",
 ];
 

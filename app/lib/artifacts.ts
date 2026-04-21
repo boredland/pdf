@@ -5,9 +5,6 @@ const STAGE_DEPENDENCIES: Record<Stage, readonly (keyof ProjectSettings)[]> = {
   preprocess: ["render", "preprocess"],
   detect: ["render", "preprocess", "detect"],
   ocr: ["render", "preprocess", "detect", "ocr"],
-  mrc: ["render", "preprocess", "mrc"],
-  // Build overlays text onto the source PDF — it only depends on OCR
-  // (and its transitive deps). MRC is no longer in the build chain.
   build: ["render", "preprocess", "detect", "ocr"],
 };
 
@@ -56,11 +53,9 @@ export function stageArtifactGlob(projectId: string, pageIndex: number, stage: S
 }
 
 export const DOWNSTREAM_STAGES: Record<Stage, readonly Stage[]> = {
-  render: ["render", "preprocess", "detect", "ocr", "mrc", "build"],
-  preprocess: ["preprocess", "detect", "ocr", "mrc", "build"],
+  render: ["render", "preprocess", "detect", "ocr", "build"],
+  preprocess: ["preprocess", "detect", "ocr", "build"],
   detect: ["detect", "ocr", "build"],
   ocr: ["ocr", "build"],
-  // MRC is now a standalone visualization — it doesn't feed into build.
-  mrc: ["mrc"],
   build: ["build"],
 };
