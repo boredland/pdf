@@ -83,11 +83,16 @@
       the composed image, ~18× source size) → ~7-8× after mask+bg split
       and 0.75-scale mask. Further drops blocked on JBIG2.  (shipped)
 - [x] CCITT Group 4 (T.6) mask encoding as the JBIG2 substitute. Pure
-      JS, PDF-native filter. ~18% tighter output on skew.pdf than the
-      prior flate /ImageMask path. True JBIG2 would win maybe another
-      1.5-2× on top but no usable WASM build is on npm right now; the
-      jbig2enc emscripten forks all have broken encoders or missing
-      exports. Revisit when one stabilises.                 (shipped)
+      JS, PDF-native filter. On skew.pdf: total output 151 KB → 139 KB
+      (8% smaller) and the mask contribution alone drops ~25% vs the
+      prior flate /ImageMask path. The often-cited "5-10× win" for G4
+      is relative to *uncompressed* 1-bit data — vs already-flate-
+      compressed 1-bit the real-world improvement is the more modest
+      25-35% we see. True JBIG2 would win another 1.5-2× (symbol
+      coding for repeated glyphs), but no usable WASM build is on npm
+      right now — agl/jbig2enc compiles but every emscripten fork we
+      found either has broken encoder bindings or never exposed them.
+      Revisit when one stabilises.                          (shipped)
 - [ ] JPEG 2000 for the background. Attempted with
       @cornerstonejs/codec-openjpeg; the J2KEncoder's parameter
       bindings are broken (setCompressionRatio/setQuality have no
