@@ -51,9 +51,8 @@ const api = {
       const { pageWidthPt: pageW, pageHeightPt: pageH } = pageInput;
       const page = doc.addPage([pageW, pageH]);
 
-      // MRC assembly: lossy background first, then a PDF native /ImageMask
-      // XObject on top. The mask is 1 bit per pixel (packed) + flate —
-      // typically 5-10× smaller than the 32-bit RGBA alpha-PNG it replaces.
+      // MRC assembly: lossy JPEG/PNG background first, then a PDF native
+      // /ImageMask XObject on top encoded with CCITT Group 4.
       const bgBytes = new Uint8Array(pageInput.bgBytes);
       const bgImage =
         pageInput.bgMimeType === "image/jpeg"

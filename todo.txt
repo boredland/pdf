@@ -82,14 +82,19 @@
 - [x] Builder: embed mask + background separately (was: lossless PNG of
       the composed image, ~18× source size) → ~7-8× after mask+bg split
       and 0.75-scale mask. Further drops blocked on JBIG2.  (shipped)
-- [ ] Real JBIG2 encoder for the mask layer — **highest-impact remaining
-      compression item**. Our "optimized mask PNG" is 8-bit RGBA with
-      all pixels clamped to 0/255 and flate-compressed by the Canvas
-      PNG encoder; a real 1-bit-per-pixel encoding via jbig2enc gets
-      another 5-10× reduction on text-heavy pages. jbig2enc-wasm exists
-      but builds are flaky — vendor our own if needed.
-- [ ] Real JPEG 2000 encoder for the background layer (current output is
-      JPEG via Canvas). openjpeg-wasm is the candidate.
+- [x] CCITT Group 4 (T.6) mask encoding as the JBIG2 substitute. Pure
+      JS, PDF-native filter. ~18% tighter output on skew.pdf than the
+      prior flate /ImageMask path. True JBIG2 would win maybe another
+      1.5-2× on top but no usable WASM build is on npm right now; the
+      jbig2enc emscripten forks all have broken encoders or missing
+      exports. Revisit when one stabilises.                 (shipped)
+- [ ] JPEG 2000 for the background. Attempted with
+      @cornerstonejs/codec-openjpeg; the J2KEncoder's parameter
+      bindings are broken (setCompressionRatio/setQuality have no
+      effect on the output) and default-lossless JP2 runs 4-5× bigger
+      than JPEG q0.5 on scan backgrounds. Needs a different library
+      (chafey/openjpegjs upstream, or a fresh openjpeg emscripten
+      build with rebuilt JS shims) before it's a win.
 - [x] PDF native /ImageMask for the mask layer (1 bit per pixel +
       flate instead of 32-bpp alpha PNG). Drops skew.pdf output from
       7.6× to 2.0× of source.                             (shipped)
