@@ -138,5 +138,6 @@
       page has OCR; prefers Tesseract's native hocr, synthesises
       per-word bboxes for hosted providers. Output is a single
       .hocr.html doc covering all pages.                     (shipped)
-- [ ] ALTO XML export (separate format, some downstream consumers
-      prefer it over hOCR).
+- [x] ALTO 4.1 XML export alongside hOCR. Same export/ module,
+      shared page-collection helper; Download ALTO button + spec.
+                                                              (shipped)

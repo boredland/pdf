@@ -1,7 +1,30 @@
+import { buildAltoDocument, type AltoPage } from "~/lib/export/alto";
 import { buildHocrDocument, type HocrPage } from "~/lib/export/hocr";
 import { readOcrResult } from "~/lib/pipeline/ocr-pipeline";
 import { readMrcManifest } from "~/lib/pipeline/mrc-pipeline";
 import { getDb, type Project } from "~/lib/storage/db";
+
+interface ShapedPage {
+  pageIndex: number;
+  ocr: Awaited<ReturnType<typeof readOcrResult>>;
+  widthPx: number;
+  heightPx: number;
+}
+
+async function collectPages(projectId: string): Promise<ShapedPage[]> {
+  const db = getDb();
+  const rows = await db.pages.where({ projectId }).sortBy("index");
+  const shaped: ShapedPage[] = [];
+  for (const row of rows) {
+    const ocr = await readOcrResult(projectId, row.index);
+    if (!ocr) continue;
+    const manifest = await readMrcManifest(projectId, row.index);
+    const widthPx = manifest?.width ?? ocr.pageSize.width;
+    const heightPx = manifest?.height ?? ocr.pageSize.height;
+    shaped.push({ pageIndex: row.index, ocr, widthPx, heightPx });
+  }
+  return shaped;
+}
 
 /**
  * Assemble a hOCR XHTML document for every OCR'd page in the project.
@@ -11,27 +34,27 @@ import { getDb, type Project } from "~/lib/storage/db";
 export async function exportProjectHocr(
   project: Project,
 ): Promise<Blob | null> {
-  const db = getDb();
-  const pages = await db.pages
-    .where({ projectId: project.id })
-    .sortBy("index");
-
-  const hocrPages: HocrPage[] = [];
-  for (const page of pages) {
-    const ocr = await readOcrResult(project.id, page.index);
-    if (!ocr) continue;
-    // Prefer the MRC manifest's dimensions — that's the coordinate frame
-    // the OCR words are in. Fall back to the OCR result's pageSize.
-    const manifest = await readMrcManifest(project.id, page.index);
-    const widthPx = manifest?.width ?? ocr.pageSize.width;
-    const heightPx = manifest?.height ?? ocr.pageSize.height;
-    hocrPages.push({ pageIndex: page.index, ocr, widthPx, heightPx });
-  }
-  if (hocrPages.length === 0) return null;
-
+  const shaped = await collectPages(project.id);
+  if (shaped.length === 0) return null;
   const xml = buildHocrDocument({
     projectName: project.name,
-    pages: hocrPages,
+    pages: shaped as HocrPage[],
   });
   return new Blob([xml], { type: "application/xhtml+xml" });
+}
+
+/**
+ * Assemble an ALTO XML document for every OCR'd page. Same page
+ * selection + dimensions logic as the hOCR export.
+ */
+export async function exportProjectAlto(
+  project: Project,
+): Promise<Blob | null> {
+  const shaped = await collectPages(project.id);
+  if (shaped.length === 0) return null;
+  const xml = buildAltoDocument({
+    projectName: project.name,
+    pages: shaped as AltoPage[],
+  });
+  return new Blob([xml], { type: "application/xml" });
 }

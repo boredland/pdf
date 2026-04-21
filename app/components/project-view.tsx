@@ -8,7 +8,7 @@ import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
 import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
 import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
-import { exportProjectHocr } from "~/lib/export/export-hocr";
+import { exportProjectAlto, exportProjectHocr } from "~/lib/export/export-hocr";
 import { PIPELINE_ORDER, runStage } from "~/lib/pipeline/run-stage";
 import { rewindToStage } from "~/lib/pipeline/rewind";
 import { PageDetailPane } from "~/components/page-detail-pane";
@@ -151,6 +151,16 @@ export function ProjectView() {
     triggerDownload(blob, `${safeFileName(project.name)}.hocr.html`);
   }, [project]);
 
+  const onDownloadAlto = useCallback(async () => {
+    if (!project) return;
+    const blob = await exportProjectAlto(project);
+    if (!blob) {
+      setError("No OCR results to export — run OCR first.");
+      return;
+    }
+    triggerDownload(blob, `${safeFileName(project.name)}.alto.xml`);
+  }, [project]);
+
   const pageList = pages ?? [];
 
   return (
@@ -221,15 +231,26 @@ export function ProjectView() {
                     </button>
                   )}
                   {pageList.some((p) => p.status.ocr) && (
-                    <button
-                      type="button"
-                      onClick={() => void onDownloadHocr()}
-                      data-testid="download-hocr"
-                      className="rounded-md border border-emerald-500/40 px-3 py-1.5 text-sm font-medium text-emerald-200 hover:bg-emerald-500/10"
-                      title="Structured OCR output (hOCR / XHTML)"
-                    >
-                      Download hOCR
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void onDownloadHocr()}
+                        data-testid="download-hocr"
+                        className="rounded-md border border-emerald-500/40 px-3 py-1.5 text-sm font-medium text-emerald-200 hover:bg-emerald-500/10"
+                        title="Structured OCR output (hOCR / XHTML)"
+                      >
+                        Download hOCR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void onDownloadAlto()}
+                        data-testid="download-alto"
+                        className="rounded-md border border-emerald-500/40 px-3 py-1.5 text-sm font-medium text-emerald-200 hover:bg-emerald-500/10"
+                        title="Structured OCR output (ALTO 4.1 XML)"
+                      >
+                        Download ALTO
+                      </button>
+                    </>
                   )}
                 </>
               )}

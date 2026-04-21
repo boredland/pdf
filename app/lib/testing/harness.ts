@@ -45,7 +45,10 @@ import {
   storeApiKey,
 } from "~/lib/api-keys";
 import { rewindToStage, setPageRotationOverride } from "~/lib/pipeline/rewind";
-import { exportProjectHocr } from "~/lib/export/export-hocr";
+import {
+  exportProjectAlto,
+  exportProjectHocr,
+} from "~/lib/export/export-hocr";
 import { EXAMPLE_PDFS, loadExamplePdf } from "~/lib/examples";
 import {
   getExifOrientation,
@@ -107,6 +110,7 @@ declare global {
         readBuildOutput: typeof readBuildOutput;
       };
       exportHocr: typeof exportProjectHocr;
+      exportAlto: typeof exportProjectAlto;
       progress: {
         compute: typeof computeProgress;
         predict: typeof predictInvalidation;
@@ -214,6 +218,7 @@ export function installTestHarness(): void {
     mrc: { runMrcPipeline, readMrcManifest },
     build: { runBuildPipeline, readBuildOutput },
     exportHocr: exportProjectHocr,
+    exportAlto: exportProjectAlto,
     progress: {
       compute: computeProgress,
       predict: predictInvalidation,
