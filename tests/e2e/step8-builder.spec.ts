@@ -56,7 +56,9 @@ test.describe("step 8 — searchable PDF builder", () => {
     }, projectId);
 
     expect(probe).not.toBeNull();
-    expect(probe!.sizeBytes).toBeGreaterThan(5_000);
+    // With the overlay approach (text added to the original PDF) the
+    // output is source + text. The synthetic fixture is tiny (~2.4 KB).
+    expect(probe!.sizeBytes).toBeGreaterThan(1_000);
     // PDF magic: "%PDF-"
     expect(probe!.header).toBe("255044462d");
     expect(probe!.pageCount).toBe(3);

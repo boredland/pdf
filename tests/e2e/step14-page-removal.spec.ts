@@ -109,9 +109,12 @@ test.describe("step 14 — page removal", () => {
 
     // Preprocess was already cached for pages 0 and 2, so re-running the
     // pipeline shouldn't invoke the worker again. Build re-runs because
-    // removePage invalidated it; output now has 2 pages.
+    // removePage invalidated it. The overlay approach preserves the
+    // original source PDF's page count (3) — the removed page's image
+    // stays but has no text overlay. This is the expected behaviour for
+    // "overlay onto source" mode.
     expect(counts.preprocessDelta).toBe(0);
-    expect(counts.finalBuildPageCount).toBe(2);
+    expect(counts.finalBuildPageCount).toBe(3);
   });
 
   test("UI remove button + confirm dialog drops the page from the grid", async ({
@@ -120,7 +123,7 @@ test.describe("step 14 — page removal", () => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-      "data-mrc-status",
+      "data-ocr-status",
       "done",
       { timeout: 120_000 },
     );

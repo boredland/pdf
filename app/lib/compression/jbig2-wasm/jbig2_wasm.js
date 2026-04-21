@@ -1,15 +1,34 @@
 /* @ts-self-types="./jbig2_wasm.d.ts" */
 
 /**
- * Encode a bitonal image as a JBIG2 generic-region stream for PDF embedding.
+ * Encode a bitonal image as a JBIG2 stream using the full encoder pipeline
+ * (CC analysis → symbol extraction → symbol-dict encoding). This is the
+ * "real" JBIG2 path that produces DjVu-class output via symbol coding.
  *
- * Input: `packed_bits` is the image in MSB-first bit-packed form (1 bit per
- * pixel, 0=white, 1=black). Rows are padded to byte boundaries, so each row
- * occupies `ceil(width / 8)` bytes — total buffer length is
- * `ceil(width / 8) * height`.
+ * Input: 1 byte per pixel, row-major, 0=white, 255=black (or any nonzero).
+ * Returns the complete JBIG2 stream suitable for `/Filter /JBIG2Decode`.
+ * @param {Uint8Array} pixels
+ * @param {number} width
+ * @param {number} height
+ * @returns {Uint8Array}
+ */
+export function encode_jbig2_document(pixels, width, height) {
+    const ptr0 = passArray8ToWasm0(pixels, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.encode_jbig2_document(ptr0, len0, width, height);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * Encode a bitonal image as a JBIG2 generic-region segment (no symbol coding).
+ * Faster but ~2× larger than the full pipeline.
  *
- * Returns the raw JBIG2 segment bytes (generic region) suitable for
- * embedding in a PDF XObject with `/Filter /JBIG2Decode`.
+ * Input: MSB-first bit-packed, rows padded to byte boundaries.
  * @param {Uint8Array} packed_bits
  * @param {number} width
  * @param {number} height

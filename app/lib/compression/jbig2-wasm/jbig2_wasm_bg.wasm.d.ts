@@ -1,6 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const encode_jbig2_document: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const encode_jbig2_generic: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const __wbindgen_externrefs: WebAssembly.Table;
 export const __wbindgen_malloc: (a: number, b: number) => number;

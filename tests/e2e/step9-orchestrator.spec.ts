@@ -22,7 +22,7 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
   }) => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
-    // 3 pages × 5 per-page stages + 1 build = 16.
+    // 3 pages × 4 per-page stages + 1 build = 13 (MRC dropped from critical path).
     await expect
       .poll(
         async () =>
@@ -158,7 +158,7 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-      "data-mrc-status",
+      "data-ocr-status",
       "done",
       { timeout: 180_000 },
     );
@@ -179,7 +179,7 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-      "data-mrc-status",
+      "data-ocr-status",
       "done",
       { timeout: 180_000 },
     );
@@ -200,7 +200,7 @@ test.describe("step 9 — orchestrator, progress, resume, confirm", () => {
     // a prefix state that'll grow after the reload.
     for (const i of [0, 1, 2]) {
       await expect(page.getByTestId(`page-card-${i}`)).toHaveAttribute(
-        "data-mrc-status",
+        "data-ocr-status",
         "done",
         { timeout: 180_000 },
       );

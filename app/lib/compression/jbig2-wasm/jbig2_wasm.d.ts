@@ -2,15 +2,20 @@
 /* eslint-disable */
 
 /**
- * Encode a bitonal image as a JBIG2 generic-region stream for PDF embedding.
+ * Encode a bitonal image as a JBIG2 stream using the full encoder pipeline
+ * (CC analysis → symbol extraction → symbol-dict encoding). This is the
+ * "real" JBIG2 path that produces DjVu-class output via symbol coding.
  *
- * Input: `packed_bits` is the image in MSB-first bit-packed form (1 bit per
- * pixel, 0=white, 1=black). Rows are padded to byte boundaries, so each row
- * occupies `ceil(width / 8)` bytes — total buffer length is
- * `ceil(width / 8) * height`.
+ * Input: 1 byte per pixel, row-major, 0=white, 255=black (or any nonzero).
+ * Returns the complete JBIG2 stream suitable for `/Filter /JBIG2Decode`.
+ */
+export function encode_jbig2_document(pixels: Uint8Array, width: number, height: number): Uint8Array;
+
+/**
+ * Encode a bitonal image as a JBIG2 generic-region segment (no symbol coding).
+ * Faster but ~2× larger than the full pipeline.
  *
- * Returns the raw JBIG2 segment bytes (generic region) suitable for
- * embedding in a PDF XObject with `/Filter /JBIG2Decode`.
+ * Input: MSB-first bit-packed, rows padded to byte boundaries.
  */
 export function encode_jbig2_generic(packed_bits: Uint8Array, width: number, height: number): Uint8Array;
 
@@ -18,6 +23,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly encode_jbig2_document: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly encode_jbig2_generic: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;

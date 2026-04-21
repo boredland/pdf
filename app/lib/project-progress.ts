@@ -20,12 +20,14 @@ export interface ProjectProgress {
   built: boolean;
 }
 
+// MRC is no longer in the critical path — the builder overlays text onto
+// the original source PDF. Progress tracks only the stages required for
+// build: render → preprocess → detect → ocr → (build).
 const PAGE_STAGES: Exclude<Stage, "build">[] = [
   "render",
   "preprocess",
   "detect",
   "ocr",
-  "mrc",
 ];
 
 export function computeProgress(project: Project, pages: Page[]): ProjectProgress {

@@ -10,7 +10,8 @@ import { runRenderPipeline, ensurePageRows } from "~/lib/pipeline/render-pipelin
 import { runPreprocessPipeline } from "~/lib/pipeline/preprocess-pipeline";
 import { runDetectPipeline } from "~/lib/pipeline/detect-pipeline";
 import { runOcrPipeline } from "~/lib/pipeline/ocr-pipeline";
-import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
+// MRC is still available via the stage picker but no longer in the "all" path.
+// import { runMrcPipeline } from "~/lib/pipeline/mrc-pipeline";
 import { runBuildPipeline, readBuildOutput } from "~/lib/pipeline/build-pipeline";
 import { exportProjectAlto, exportProjectHocr } from "~/lib/export/export-hocr";
 import { PIPELINE_ORDER, runStage } from "~/lib/pipeline/run-stage";
@@ -160,8 +161,9 @@ export function ProjectView() {
         if (controller.signal.aborted) return;
         await runOcrPipeline(project, { signal: controller.signal });
         if (controller.signal.aborted) return;
-        await runMrcPipeline(project, { signal: controller.signal });
-        if (controller.signal.aborted) return;
+        // Build overlays text onto the original PDF — MRC is no longer
+        // in the critical path. It can still be run separately via the
+        // stage picker for visualization.
         const fresh = await getDb().projects.get(project.id);
         if (fresh) await runBuildPipeline(fresh, { signal: controller.signal });
       } else {

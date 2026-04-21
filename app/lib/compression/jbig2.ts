@@ -9,7 +9,10 @@
  * flags internally, so the PDF XObject dict doesn't need DecodeParms.
  */
 
-import initWasm, { encode_jbig2_generic } from "./jbig2-wasm/jbig2_wasm.js";
+import initWasm, {
+  encode_jbig2_document,
+  encode_jbig2_generic,
+} from "./jbig2-wasm/jbig2_wasm.js";
 
 let ready: Promise<void> | null = null;
 
@@ -21,6 +24,26 @@ async function ensureInit(): Promise<void> {
     ready = initWasm(url).then(() => undefined);
   }
   return ready;
+}
+
+/**
+ * Encode a bitonal image via the full JBIG2 pipeline (CC analysis →
+ * symbol extraction → symbol-dict + text-region encoding). Falls back to
+ * generic-region when symbol coding doesn't compress better.
+ *
+ * Input: 1 byte per pixel, row-major, 0=white, nonzero=black. This is
+ * a different layout from the packed-bits path — the builder unpacks
+ * from ImageData before calling.
+ *
+ * Returns the complete JBIG2 stream for `/Filter /JBIG2Decode`.
+ */
+export async function encodeJbig2Document(
+  pixels: Uint8Array,
+  widthPx: number,
+  heightPx: number,
+): Promise<Uint8Array> {
+  await ensureInit();
+  return encode_jbig2_document(pixels, widthPx, heightPx);
 }
 
 /**

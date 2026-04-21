@@ -22,7 +22,11 @@ export async function buildPdf(input: BuilderInput) {
     const w = window as typeof window & { __pdfBuildCallCount?: number };
     w.__pdfBuildCallCount = (w.__pdfBuildCallCount ?? 0) + 1;
   }
-  return instance.build(input);
+  // Transfer the (potentially large) source PDF bytes to the worker so
+  // we don't copy multi-MB buffers across the postMessage boundary.
+  return instance.build(
+    Comlink.transfer(input, [input.sourcePdfBytes]),
+  );
 }
 
 export function tearDownBuilder(): void {

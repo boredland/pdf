@@ -81,16 +81,32 @@ test.describe("step 7 — MRC split + compression", () => {
     }
   });
 
-  test("full pipeline flips mrc-status=done on every card", async ({ page }) => {
-    await page.getByTestId("load-example-synthetic").click();
-    await page.getByTestId("run-stage-button").click();
-    for (const idx of [0, 1, 2]) {
-      await expect(page.getByTestId(`page-card-${idx}`)).toHaveAttribute(
-        "data-mrc-status",
-        "done",
-        { timeout: 120_000 },
+  test("runStage('mrc') via harness flips mrc-status=done on every page", async ({ page }) => {
+    // MRC is no longer in the UI's "all" pipeline — test it via harness.
+    const result = await page.evaluate(async () => {
+      const app = window.__pdfApp!;
+      const bytes = await app.example.load();
+      const project = await app.projects.createProjectFromBytes("mrc-full", bytes);
+      await app.render.ensurePageRows(project);
+      await app.pipeline.runStage(
+        (await app.projects.getProject(project.id))!,
+        "render",
       );
-    }
+      await app.pipeline.runStage(
+        (await app.projects.getProject(project.id))!,
+        "preprocess",
+      );
+      await app.pipeline.runStage(
+        (await app.projects.getProject(project.id))!,
+        "mrc",
+      );
+      const pages = await app.db.pages
+        .where({ projectId: project.id })
+        .toArray();
+      return pages.map((p) => !!p.status.mrc);
+    });
+    expect(result.every(Boolean)).toBe(true);
+    expect(result.length).toBe(3);
   });
 
   test("changing preset re-runs only mrc, not earlier stages", async ({ page }) => {

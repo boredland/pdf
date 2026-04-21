@@ -133,9 +133,7 @@
       build short-circuit (step19), OPFS graceful-absence read
       (step19). Full quota-exhaustion still needs a Chromium flag.
                                                               (shipped)
-- [ ] `optimize-mask` threshold is hard-coded at 128 — no exposure in
-      settings, no visual regression. Fine today, flag if it starts
-      clipping antialiased masks.
+- [x] Mask threshold exposed as a settings slider (64-224).  (shipped)
 
 ## Stretch (post-v1)
 - [ ] CRAFT ONNX text detector (swap MSER when better IoU proven)

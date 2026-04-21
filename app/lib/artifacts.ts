@@ -6,7 +6,9 @@ const STAGE_DEPENDENCIES: Record<Stage, readonly (keyof ProjectSettings)[]> = {
   detect: ["render", "preprocess", "detect"],
   ocr: ["render", "preprocess", "detect", "ocr"],
   mrc: ["render", "preprocess", "mrc"],
-  build: ["render", "preprocess", "detect", "ocr", "mrc"],
+  // Build overlays text onto the source PDF — it only depends on OCR
+  // (and its transitive deps). MRC is no longer in the build chain.
+  build: ["render", "preprocess", "detect", "ocr"],
 };
 
 async function sha256Hex(input: string): Promise<string> {
@@ -58,6 +60,7 @@ export const DOWNSTREAM_STAGES: Record<Stage, readonly Stage[]> = {
   preprocess: ["preprocess", "detect", "ocr", "mrc", "build"],
   detect: ["detect", "ocr", "build"],
   ocr: ["ocr", "build"],
-  mrc: ["mrc", "build"],
+  // MRC is now a standalone visualization — it doesn't feed into build.
+  mrc: ["mrc"],
   build: ["build"],
 };

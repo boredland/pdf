@@ -1,88 +1,60 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
-import {
-  PDFDocument,
-  PDFRawStream,
-  StandardFonts,
-  drawObject,
-  popGraphicsState,
-  pushGraphicsState,
-  scale,
-  setFillingGrayscaleColor,
-  translate,
-} from "pdf-lib";
-import { encodeJbig2 } from "~/lib/compression/jbig2";
-import { encodeCcittG4 } from "~/lib/compression/ccitt-g4";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import type { OcrResult, OcrWord } from "~/lib/providers/types";
 
-export interface BuilderPageInput {
-  /** Bitonal mask PNG (black text on white). Becomes the foreground text layer. */
-  maskPngBytes: ArrayBuffer;
-  /** Lossy background layer (JPEG/PNG at reduced resolution). */
-  bgBytes: ArrayBuffer;
-  /** MIME type for bgBytes — "image/jpeg" or "image/png". */
-  bgMimeType: string;
-  /** When true, skip the mask overlay (photo-dominated or blank page). */
-  skipMask?: boolean;
+/** Per-page OCR data needed for the overlay. */
+export interface OverlayPageInput {
   ocr: OcrResult;
-  /** Physical page size in points (PDF default is 72dpi). */
+  /** Physical page size in points (72 DPI base). */
   pageWidthPt: number;
   pageHeightPt: number;
 }
 
 export interface BuilderInput {
   projectName: string;
-  pages: BuilderPageInput[];
+  /** The original source PDF bytes — we'll load it and add text on top. */
+  sourcePdfBytes: ArrayBuffer;
+  /** One entry per page that has OCR output. Pages without OCR are left as-is. */
+  pages: OverlayPageInput[];
+  /** Sparse map: pageIndex → OverlayPageInput index in `pages`. */
+  pageIndexMap: number[];
 }
 
 export interface BuilderOutput {
   pdfBytes: ArrayBuffer;
-  /** `true` if the JBIG2 WASM encoder was used for masks (vs CCITT G4 fallback). */
-  usedJbig2?: boolean;
 }
 
 const api = {
+  /**
+   * Overlay invisible OCR text onto the **original** source PDF. This
+   * preserves the source's native image encoding (JPEG, CCITT, whatever
+   * the scanner wrote) so the output is source-size + a few KB of text.
+   * No re-encoding, no quality loss, no compression regression.
+   */
   async build(input: BuilderInput): Promise<BuilderOutput> {
-    const doc = await PDFDocument.create();
-    doc.setTitle(input.projectName);
+    const doc = await PDFDocument.load(input.sourcePdfBytes, {
+      updateMetadata: false,
+    });
     doc.setCreator("pdf — client-side OCR");
     doc.setProducer("pdf-lib + tesseract.js");
 
     const font = await doc.embedFont(StandardFonts.Helvetica);
-    let usedJbig2Global = false;
+    const pdfPages = doc.getPages();
 
-    for (const pageInput of input.pages) {
-      const { pageWidthPt: pageW, pageHeightPt: pageH } = pageInput;
-      const page = doc.addPage([pageW, pageH]);
+    for (let i = 0; i < input.pageIndexMap.length; i++) {
+      const overlayIdx = input.pageIndexMap[i];
+      if (overlayIdx === undefined || overlayIdx < 0) continue;
+      const overlay = input.pages[overlayIdx];
+      if (!overlay) continue;
 
-      // MRC assembly: lossy JPEG/PNG background first, then a PDF native
-      // /ImageMask XObject on top encoded with CCITT Group 4.
-      const bgBytes = new Uint8Array(pageInput.bgBytes);
-      const bgImage =
-        pageInput.bgMimeType === "image/jpeg"
-          ? await doc.embedJpg(bgBytes)
-          : await doc.embedPng(bgBytes);
-      page.drawImage(bgImage, { x: 0, y: 0, width: pageW, height: pageH });
+      const page = pdfPages[i];
+      if (!page) continue;
 
-      // Skip the mask overlay for blank or photo-dominated pages — the
-      // MRC split flagged this upstream and the bg alone is a faithful
-      // representation. Saves the per-page mask bytes.
-      if (!pageInput.skipMask) {
-        const didJbig2 = await drawMaskAsImageMask(
-          doc,
-          page,
-          new Uint8Array(pageInput.maskPngBytes),
-          pageW,
-          pageH,
-        );
-        if (didJbig2) usedJbig2Global = true;
-      }
-
-      // Overlay invisible OCR words. opacity:0 renders the text into the
-      // content stream (so PDF viewers extract it) without painting pixels.
-      const sxPerPx = pageW / pageInput.ocr.pageSize.width;
-      const syPerPx = pageH / pageInput.ocr.pageSize.height;
-      for (const word of pageInput.ocr.words) {
+      const { width: pageW, height: pageH } = page.getSize();
+      const sxPerPx = pageW / overlay.ocr.pageSize.width;
+      const syPerPx = pageH / overlay.ocr.pageSize.height;
+      for (const word of overlay.ocr.words) {
         if (!word.text.trim()) continue;
         drawInvisibleWord(page, font, word, sxPerPx, syPerPx, pageH);
       }
@@ -91,131 +63,9 @@ const api = {
     const bytes = await doc.save();
     const transferable = new ArrayBuffer(bytes.byteLength);
     new Uint8Array(transferable).set(bytes);
-    return Comlink.transfer(
-      { pdfBytes: transferable, usedJbig2: usedJbig2Global },
-      [transferable],
-    );
+    return Comlink.transfer({ pdfBytes: transferable }, [transferable]);
   },
 };
-
-/**
- * Draw a bitonal mask onto a page as a PDF /ImageMask XObject.
- *
- * Primary path: JBIG2 generic-region encoding (85 KB vendored WASM,
- * ~2-5× tighter than CCITT G4 on text-heavy pages).
- * Fallback: CCITT Group 4 (pure JS) if the WASM fails to load.
- *
- * PDF convention: in the decoded output, 0 = paint with current fill,
- * 1 = transparent. For JBIG2, 0 = white / 1 = black in standard
- * convention, which inverts the ImageMask sense. We therefore set
- * /Decode [1 0] in the XObject dict to flip the interpretation so
- * text pixels (JBIG2 black = 1) paint and background (white = 0) is
- * transparent.
- */
-async function drawMaskAsImageMask(
-  doc: PDFDocument,
-  page: ReturnType<PDFDocument["addPage"]>,
-  maskPng: Uint8Array,
-  pageWidthPt: number,
-  pageHeightPt: number,
-): Promise<boolean> {
-  const blob = new Blob([maskPng.slice().buffer], { type: "image/png" });
-  const bitmap = await createImageBitmap(blob);
-  const widthPx = bitmap.width;
-  const heightPx = bitmap.height;
-
-  const canvas = new OffscreenCanvas(widthPx, heightPx);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("2d ctx unavailable");
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close?.();
-  const { data } = ctx.getImageData(0, 0, widthPx, heightPx);
-
-  // Pack into MSB-first 1-bit-per-pixel: 1 = black (text), 0 = white (bg).
-  const bytesPerRow = Math.ceil(widthPx / 8);
-  const packed = new Uint8Array(bytesPerRow * heightPx);
-  for (let y = 0; y < heightPx; y++) {
-    const rowOffset = y * bytesPerRow;
-    for (let x = 0; x < widthPx; x++) {
-      const lum = data[(y * widthPx + x) * 4]!;
-      if (lum < 128) {
-        // text pixel → bit = 1
-        packed[rowOffset + (x >> 3)]! |= 1 << (7 - (x & 7));
-      }
-    }
-  }
-
-  // Try JBIG2 first; fall back to CCITT G4 if the WASM can't load.
-  let encoded: Uint8Array;
-  let useJbig2 = false;
-  try {
-    encoded = await encodeJbig2(packed, widthPx, heightPx);
-    useJbig2 = true;
-  } catch {
-    // JBIG2 WASM failed — fall back to CCITT G4 (pure JS, always works).
-    // CCITT convention: 0=white, 1=black — same bit layout as our packed.
-    // But for ImageMask: 0=paint, 1=transparent. So we need inverted bits.
-    const ccittPixels = new Uint8Array(widthPx * heightPx);
-    for (let i = 0, j = 0; j < ccittPixels.length; i += 4, j++) {
-      ccittPixels[j] = (data[i] ?? 0) < 128 ? 1 : 0;
-    }
-    encoded = encodeCcittG4({
-      pixels: ccittPixels,
-      width: widthPx,
-      height: heightPx,
-    });
-  }
-
-  let dict;
-  if (useJbig2) {
-    dict = doc.context.obj({
-      Type: "XObject",
-      Subtype: "Image",
-      Width: widthPx,
-      Height: heightPx,
-      BitsPerComponent: 1,
-      ImageMask: true,
-      Filter: "JBIG2Decode",
-      // /Decode [1 0] flips the bit interpretation: JBIG2's 1 (black)
-      // becomes "paint" in ImageMask, and 0 (white) becomes transparent.
-      Decode: [1, 0],
-      Length: encoded.byteLength,
-    });
-  } else {
-    const decodeParms = doc.context.obj({
-      K: -1,
-      Columns: widthPx,
-      Rows: heightPx,
-      EndOfBlock: true,
-    });
-    dict = doc.context.obj({
-      Type: "XObject",
-      Subtype: "Image",
-      Width: widthPx,
-      Height: heightPx,
-      BitsPerComponent: 1,
-      ImageMask: true,
-      Filter: "CCITTFaxDecode",
-      DecodeParms: decodeParms,
-      Length: encoded.byteLength,
-    });
-  }
-
-  const stream = PDFRawStream.of(dict, encoded);
-  const ref = doc.context.register(stream);
-  const name = page.node.newXObject("Mask", ref);
-
-  page.pushOperators(
-    pushGraphicsState(),
-    setFillingGrayscaleColor(0),
-    translate(0, 0),
-    scale(pageWidthPt, pageHeightPt),
-    drawObject(name),
-    popGraphicsState(),
-  );
-  return useJbig2;
-}
-
 
 function drawInvisibleWord(
   page: ReturnType<PDFDocument["addPage"]>,

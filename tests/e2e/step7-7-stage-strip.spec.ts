@@ -10,7 +10,7 @@ async function bootstrapFull(page: Page) {
   await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
   await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-    "data-mrc-status",
+    "data-ocr-status",
     "done",
     { timeout: 120_000 },
   );
@@ -33,8 +33,10 @@ test.describe("step 7.7 — per-stage thumbs + image modal", () => {
     await page.getByTestId("page-details-summary-0").click();
     await expect(page.getByTestId("stage-strip-0")).toBeVisible();
 
-    // Every stage's thumb appears and is enabled after the full pipeline.
-    for (const stage of ["render", "preprocess", "detect", "ocr", "mrc"]) {
+    // Stages in the critical path (render→preprocess→detect→ocr) are
+    // enabled after the UI "Run". MRC isn't in the default pipeline —
+    // its thumb may be disabled or pending.
+    for (const stage of ["render", "preprocess", "detect", "ocr"]) {
       const thumb = page.getByTestId(`stage-thumb-0-${stage}`);
       await expect(thumb).toBeVisible();
       await expect(thumb).not.toBeDisabled();
@@ -47,7 +49,7 @@ test.describe("step 7.7 — per-stage thumbs + image modal", () => {
     await bootstrapFull(page);
     await page.getByTestId("page-details-summary-0").click();
 
-    for (const stage of ["render", "preprocess", "detect", "mrc"]) {
+    for (const stage of ["render", "preprocess", "detect"]) {
       await page.getByTestId(`stage-thumb-0-${stage}`).click();
       const modal = page.getByTestId("image-modal");
       await expect(modal).toBeVisible();

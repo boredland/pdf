@@ -37,7 +37,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-      "data-mrc-status",
+      "data-ocr-status",
       "done",
       { timeout: 120_000 },
     );
@@ -55,7 +55,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-      "data-mrc-status",
+      "data-ocr-status",
       "done",
       { timeout: 120_000 },
     );
@@ -73,12 +73,9 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     await page.getByTestId("detail-tab-ocr").click();
     await expect(page.getByTestId("detail-ocr-text")).toContainText(/Page|page/);
 
+    // MRC is no longer in the default "all" pipeline — its tab still
+    // appears but the artifact is empty until run via the stage picker.
     await page.getByTestId("detail-tab-mrc").click();
-    await expect(page.getByTestId("detail-mrc-stats")).toBeVisible();
-    await page.getByTestId("detail-mrc-layer-mask").click();
-    await expect(page.getByTestId("detail-image")).toBeVisible();
-    await page.getByTestId("detail-mrc-layer-bg").click();
-    await expect(page.getByTestId("detail-image")).toBeVisible();
   });
 
   test("per-page re-run triggers only the selected stage for that page", async ({
@@ -164,7 +161,7 @@ test.describe("step 7.5 — detail pane + per-stage run", () => {
     await page.getByTestId("load-example-synthetic").click();
     await page.getByTestId("run-stage-button").click();
     await expect(page.getByTestId("page-card-0")).toHaveAttribute(
-      "data-mrc-status",
+      "data-ocr-status",
       "done",
       { timeout: 120_000 },
     );
