@@ -71,6 +71,10 @@ const api = {
 
       for (const word of overlay.ocr.words) {
         if (!word.text.trim()) continue;
+        // Skip OCR noise: very short fragments and low-confidence guesses
+        // add bytes without helping search.
+        if (word.text.length < 2 && word.confidence < 0.5) continue;
+        if (word.confidence < 0.2) continue;
 
         const bx = word.bbox.x;
         const by = word.bbox.y;
@@ -124,7 +128,7 @@ const api = {
       }
     }
 
-    const bytes = await doc.save();
+    const bytes = await doc.save({ useObjectStreams: true });
     const transferable = new ArrayBuffer(bytes.byteLength);
     new Uint8Array(transferable).set(bytes);
     return Comlink.transfer({ pdfBytes: transferable }, [transferable]);
