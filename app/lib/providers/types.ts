@@ -37,6 +37,11 @@ export interface RecognizeInput {
   pngBytes: ArrayBuffer;
   pageIndex: number;
   language: string;
+  /**
+   * Optional precomputed text regions in page coordinates. Providers that can
+   * use external layout hints may skip their internal detection stage.
+   */
+  regions?: { x: number; y: number; width: number; height: number }[];
   signal?: AbortSignal;
   onProgress?: (p: ProviderProgress) => void;
 }

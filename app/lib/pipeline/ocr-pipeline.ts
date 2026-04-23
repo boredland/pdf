@@ -103,10 +103,12 @@ export async function runOcrPipeline(
           signal: options.signal,
         });
       } else {
+        const detect = await readDetectRegions(project.id, pageIndex);
         result = await provider.recognize({
           pngBytes,
           pageIndex,
           language: project.settings.ocr.language,
+          regions: detect?.regions,
           signal: options.signal,
         });
       }
