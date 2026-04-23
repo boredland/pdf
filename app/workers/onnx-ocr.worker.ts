@@ -45,7 +45,7 @@ const REC_HEIGHT = 48;
 const REC_WIDTH = 320;
 const CLS_WIDTH = 160;
 const CLS_HEIGHT = 80;
-const REC_SCORE_MIN = 0.35;
+const REC_SCORE_MIN = 0.2;
 const CLS_SCORE_MIN = 0.9;
 const CLS_LABELS = ["0", "180"] as const;
 
@@ -103,7 +103,11 @@ async function getDictionary() {
       if (!response.ok) throw new Error(`failed to load OCR dictionary (${response.status})`);
       return response.text();
     })
-    .then((text) => ["", ...text.split(/\n/).map((line) => line.replace(/\r$/, "")).filter(Boolean)]);
+    .then((text) => [
+      "",
+      ...text.split(/\n/).map((line) => line.replace(/\r$/, "")).filter(Boolean),
+      " ",
+    ]);
   return dictPromise;
 }
 
@@ -399,25 +403,31 @@ function decodeCtc(output: ort.Tensor, dictionary: string[]): { text: string; co
   const data = output.data as Float32Array;
   const dims = output.dims;
   if (dims.length !== 3) return { text: "", confidence: 0 };
-  const d1 = dims[1] as number;
-  const d2 = dims[2] as number;
-  const seqFirst = d2 >= dictionary.length * 0.7;
-  const seqLen = seqFirst ? d1 : d2;
-  const vocab = seqFirst ? d2 : d1;
-  let prev = -1;
+  const seqLen = dims[1] as number;
+  const vocab = dims[2] as number;
+  if (!seqLen || !vocab) return { text: "", confidence: 0 };
+
+  let prevToken = -1;
   const chars: string[] = [];
   const confidences: number[] = [];
-  const row = new Float32Array(vocab);
   for (let t = 0; t < seqLen; t++) {
-    for (let c = 0; c < vocab; c++) {
-      row[c] = seqFirst ? data[t * vocab + c] ?? -Infinity : data[c * seqLen + t] ?? -Infinity;
+    let bestToken = 0;
+    let bestProbability = 0;
+    for (let token = 0; token < vocab; token++) {
+      const probability = data[t * vocab + token] ?? 0;
+      if (probability > bestProbability) {
+        bestProbability = probability;
+        bestToken = token;
+      }
     }
-    const { index, probability } = softmaxArgmax(row);
-    if (index !== 0 && index !== prev && dictionary[index]) {
-      chars.push(dictionary[index] as string);
-      confidences.push(probability);
+    if (bestToken !== 0 && bestToken !== prevToken) {
+      const tokenText = dictionary[bestToken];
+      if (tokenText) {
+        chars.push(tokenText);
+        confidences.push(bestProbability);
+      }
     }
-    prev = index;
+    prevToken = bestToken;
   }
   const text = chars.join("").trim();
   const confidence = confidences.length
@@ -428,6 +438,83 @@ function decodeCtc(output: ort.Tensor, dictionary: string[]): { text: string; co
 
 function sortRegions(regions: Box[]): Box[] {
   return [...regions].sort((a, b) => (Math.abs(a.y - b.y) < 10 ? a.x - b.x : a.y - b.y));
+}
+
+function refineRegionToLines(region: Box, pageImage: ImageData): Box[] {
+  const image = crop(pageImage, region);
+  const rowInk = new Uint16Array(image.height);
+
+  for (let y = 0; y < image.height; y++) {
+    let ink = 0;
+    for (let x = 0; x < image.width; x++) {
+      const px = (y * image.width + x) * 4;
+      const value = resizedPixelLuma(image.data, px);
+      if (value < 200) ink++;
+    }
+    rowInk[y] = ink;
+  }
+
+  const rowThreshold = Math.max(2, Math.round(image.width * 0.01));
+  const minRunHeight = Math.max(8, Math.round(image.height * 0.12));
+  const mergeGap = Math.max(2, Math.round(image.height * 0.03));
+  const runs: Array<{ start: number; end: number }> = [];
+
+  let start = -1;
+  let gap = 0;
+  for (let y = 0; y < rowInk.length; y++) {
+    if ((rowInk[y] ?? 0) >= rowThreshold) {
+      if (start < 0) start = y;
+      gap = 0;
+      continue;
+    }
+    if (start < 0) continue;
+    gap++;
+    if (gap <= mergeGap) continue;
+    const end = y - gap;
+    if (end - start + 1 >= minRunHeight) runs.push({ start, end });
+    start = -1;
+    gap = 0;
+  }
+  if (start >= 0) {
+    const end = rowInk.length - 1;
+    if (end - start + 1 >= minRunHeight) runs.push({ start, end });
+  }
+
+  if (runs.length === 0) return [region];
+
+  return runs.map((run) => {
+    let minX = image.width - 1;
+    let maxX = 0;
+    for (let y = run.start; y <= run.end; y++) {
+      for (let x = 0; x < image.width; x++) {
+        const px = (y * image.width + x) * 4;
+        const value = resizedPixelLuma(image.data, px);
+        if (value >= 200) continue;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+      }
+    }
+    const hasInk = maxX >= minX;
+    const padX = hasInk ? Math.max(2, Math.round((maxX - minX + 1) * 0.02)) : 0;
+    const padY = Math.max(2, Math.round((run.end - run.start + 1) * 0.15));
+    const x = hasInk ? Math.max(0, region.x + minX - padX) : region.x;
+    const right = hasInk ? Math.min(pageImage.width, region.x + maxX + 1 + padX) : region.x + region.width;
+    const y = Math.max(0, region.y + run.start - padY);
+    const bottom = Math.min(pageImage.height, region.y + run.end + 1 + padY);
+    return {
+      x,
+      y,
+      width: Math.max(1, right - x),
+      height: Math.max(1, bottom - y),
+    };
+  });
+}
+
+function resizedPixelLuma(data: Uint8ClampedArray, px: number): number {
+  const r = data[px] ?? 255;
+  const g = data[px + 1] ?? r;
+  const b = data[px + 2] ?? r;
+  return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
 function toApproxWords(text: string, confidence: number, box: Box): OcrWord[] {
@@ -461,7 +548,7 @@ async function recognizeRegion(
   pageImage: ImageData,
   recSession: ort.InferenceSession,
   dictionary: string[],
-): Promise<{ line: OcrLine; words: OcrWord[] } | null> {
+): Promise<{ line: OcrLine | null; words: OcrWord[] }> {
   const rawCrop = crop(pageImage, region);
   const angle = await classifyOrientation(rawCrop);
   const cropImage = angle === 180 ? rotate180(rawCrop) : rawCrop;
@@ -469,7 +556,9 @@ async function recognizeRegion(
   const output = await recSession.run({ [recSession.inputNames[0] as string]: recInput });
   const first = output[Object.keys(output)[0] as string] as ort.Tensor;
   const decoded = decodeCtc(first, dictionary);
-  if (!decoded.text || decoded.confidence < REC_SCORE_MIN) return null;
+  if (!decoded.text || decoded.confidence < REC_SCORE_MIN) {
+    return { line: null, words: [] };
+  }
   const words = toApproxWords(decoded.text, decoded.confidence, region);
   return {
     words,
@@ -492,7 +581,9 @@ const api: OnnxOcrWorkerApi = {
     const pageImage = await decodePng(input.pngBytes);
     const pageSize = { width: pageImage.width, height: pageImage.height };
     const regions = input.regions?.length ? input.regions : await detectRegions(pageImage);
-    const sortedRegions = sortRegions(regions);
+    const sortedRegions = sortRegions(
+      regions.flatMap((region) => refineRegionToLines(region, pageImage)).slice(0, MAX_REGIONS),
+    );
     const words: OcrWord[] = [];
     const lines: OcrLine[] = [];
     const fullText: string[] = [];
@@ -513,7 +604,7 @@ const api: OnnxOcrWorkerApi = {
         0.15 + ((index + 1) / sortedRegions.length) * 0.85,
         `recognizing region ${index + 1}/${sortedRegions.length}`,
       );
-      if (!recognized) continue;
+      if (!recognized.line) continue;
       words.push(...recognized.words);
       lines.push(recognized.line);
       fullText.push(recognized.line.text);

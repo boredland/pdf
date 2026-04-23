@@ -209,9 +209,10 @@ async function waitForHarness(page) {
 }
 
 async function startServer(cwd, port) {
+  await runCommand("npm", ["run", "build"], cwd);
   const child = spawn(
-    "bun",
-    ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    "npm",
+    ["run", "preview", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
     { cwd, stdio: ["ignore", "pipe", "pipe"] },
   );
   const logs = [];
@@ -222,7 +223,7 @@ async function startServer(cwd, port) {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      throw new Error(`dev server exited early for ${cwd}\n${logs.join("")}`);
+      throw new Error(`preview server exited early for ${cwd}\n${logs.join("")}`);
     }
     try {
       const response = await fetch(url);
@@ -232,7 +233,7 @@ async function startServer(cwd, port) {
     }
     await sleep(500);
   }
-  throw new Error(`timed out waiting for dev server at ${url}\n${logs.join("")}`);
+  throw new Error(`timed out waiting for preview server at ${url}\n${logs.join("")}`);
 }
 
 async function stopServer(server) {
@@ -374,4 +375,19 @@ function round(value, places) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runCommand(command, args, cwd) {
+  const child = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+  const logs = [];
+  child.stdout.on("data", (chunk) => logs.push(chunk.toString("utf8")));
+  child.stderr.on("data", (chunk) => logs.push(chunk.toString("utf8")));
+
+  await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${command} ${args.join(" ")} failed\n${logs.join("")}`));
+    });
+  });
 }
