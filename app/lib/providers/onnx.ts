@@ -50,7 +50,15 @@ async function getDictionary() {
       if (!res.ok) throw new Error(`failed to load OCR dictionary (${res.status})`);
       return res.text();
     })
-    .then((text) => ["", ...text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)]);
+    .then((text) => {
+      // Keep dictionary tokens verbatim so we don't lose the explicit "space"
+      // token used by English models. Trimming would collapse it away.
+      const tokens = text
+        .split(/\n/)
+        .map((s) => s.replace(/\r$/, ""))
+        .filter((s) => s.length > 0);
+      return ["", ...tokens];
+    });
   return dictPromise;
 }
 
