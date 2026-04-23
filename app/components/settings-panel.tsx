@@ -4,6 +4,7 @@ import type { Project, Stage } from "~/lib/storage/db";
 import { getDb } from "~/lib/storage/db";
 import { listProviders } from "~/lib/providers/registry";
 import { predictInvalidation, type SettingsInvalidation } from "~/lib/project-progress";
+import { rewindToStage } from "~/lib/pipeline/rewind";
 import { ConfirmModal } from "~/components/confirm-modal";
 
 interface PendingChange {
@@ -54,6 +55,9 @@ export function SettingsPanel({
       await getDb().projects.update(project.id, {
         settings: { ...project.settings, ocr: { ...project.settings.ocr, providerId: id } },
       });
+      // Provider changes invalidate OCR output semantics; clear OCR+build now
+      // so progress reflects the new configuration immediately.
+      await rewindToStage(project.id, "ocr");
     };
     await confirmIfDestructive("OCR provider", ["ocr"], apply);
   }
