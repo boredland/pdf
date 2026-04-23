@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:ocr:branches": "bun test tests/ocr-branch-quality.test.mjs",
+    "test:ocr:providers": "bun test tests/ocr-provider-quality.test.mjs",
     "test:e2e": "playwright test",
     "postinstall": "bun run scripts/fetch-assets.ts"
   },
