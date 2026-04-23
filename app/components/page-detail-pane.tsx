@@ -355,6 +355,7 @@ function DetectJson({ project, page }: { project: Project; page: Page }) {
 function OcrView({ project, page }: { project: Project; page: Page }) {
   const [text, setText] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState(0);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -373,14 +374,62 @@ function OcrView({ project, page }: { project: Project; page: Page }) {
     };
   }, [project.id, page.index, page.status.ocr?.hash]);
 
+  async function onCopy() {
+    const value = text?.trim() ?? "";
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.setAttribute("readonly", "true");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        if (!ok) throw new Error("execCommand copy failed");
+      }
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    } finally {
+      window.setTimeout(() => setCopyStatus("idle"), 1800);
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="grid gap-3 lg:grid-cols-2">
         <ImageArtifact path={page.status.preprocess?.artifactPath} />
         <div className="flex flex-col gap-2 rounded border border-slate-800 bg-slate-900 p-3">
-          <p className="text-xs text-slate-400" data-testid="detail-ocr-meta">
-            {wordCount} word{wordCount === 1 ? "" : "s"}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-400" data-testid="detail-ocr-meta">
+              {wordCount} word{wordCount === 1 ? "" : "s"}
+            </p>
+            <button
+              type="button"
+              data-testid="detail-ocr-copy"
+              onClick={() => void onCopy()}
+              disabled={!text?.trim()}
+              className="rounded border border-slate-700 px-2 py-1 text-[11px] text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Copy OCR text to clipboard"
+            >
+              Copy text
+            </button>
+          </div>
+          {copyStatus === "copied" && (
+            <p className="text-[11px] text-emerald-300" data-testid="detail-ocr-copy-status">
+              Copied.
+            </p>
+          )}
+          {copyStatus === "failed" && (
+            <p className="text-[11px] text-red-300" data-testid="detail-ocr-copy-status">
+              Copy failed.
+            </p>
+          )}
           <pre
             data-testid="detail-ocr-text"
             className="whitespace-pre-wrap break-words text-xs text-slate-200"
