@@ -1,5 +1,6 @@
 import type { OcrProvider } from "./types";
 import { tesseractProvider } from "./tesseract";
+import { onnxProvider } from "./onnx";
 import { geminiProvider } from "./gemini";
 import { mistralProvider } from "./mistral";
 
@@ -8,6 +9,7 @@ import { mistralProvider } from "./mistral";
 // prod bundles' provider dropdown.
 const PROVIDERS: OcrProvider[] = [
   tesseractProvider,
+  onnxProvider,
   geminiProvider,
   mistralProvider,
 ];
